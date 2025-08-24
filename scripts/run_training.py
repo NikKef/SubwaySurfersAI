@@ -47,7 +47,3 @@ def main() -> None:
     args.model_path.parent.mkdir(parents=True, exist_ok=True)
     agent.save(str(args.model_path))
     env.close()
-
-
-if __name__ == "__main__":
-    main()

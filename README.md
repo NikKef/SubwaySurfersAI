@@ -58,7 +58,6 @@ After training, watch the agent play:
 ```bash
 python scripts/play_agent.py --model-path models/dqn_subway_agent
 ```
-
 ## Project Structure
 
 ```
