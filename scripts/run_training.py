@@ -16,7 +16,6 @@ if str(ROOT) not in sys.path:
 from src.agent import DQNAgent  # noqa: E402
 from src.env import SubwaySurfersEnv  # noqa: E402
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the Subway Surfers agent")
     parser.add_argument(
@@ -62,6 +61,7 @@ def main() -> None:
     args.model_path.parent.mkdir(parents=True, exist_ok=True)
     agent.save(str(args.model_path))
     env.close()
+
 
 
 if __name__ == "__main__":
