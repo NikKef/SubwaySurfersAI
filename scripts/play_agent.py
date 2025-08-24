@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from src.agent import DQNAgent
-from src.env import SubwaySurfersEnv
+# Allow running as a script without installing the package
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.agent import DQNAgent  # noqa: E402
+from src.env import SubwaySurfersEnv  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
