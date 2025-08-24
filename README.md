@@ -22,6 +22,19 @@ pip install -r requirements.txt
 
 Install [Android Studio](https://developer.android.com/studio) and configure a device with *Subway Surfers*. Make sure the `adb` command is available in your PATH.
 
+### 4. Interact with the emulator
+
+The `ADBController` class offers a minimal wrapper around the `adb` binary for screen capture and input events. Example:
+
+```python
+from src.env import ADBController
+
+ctrl = ADBController()
+image_bytes = ctrl.screencap()  # PNG bytes of the current screen
+ctrl.tap(100, 200)              # tap at x=100, y=200
+```
+
+### 5. Run formatting and linting
 
 The project uses [pre-commit](https://pre-commit.com/) hooks for formatting and linting.
 

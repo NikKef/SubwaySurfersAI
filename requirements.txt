@@ -1,5 +1,6 @@
 adbutils
 numpy
+pillow
 opencv-python
 torch
 stable-baselines3
