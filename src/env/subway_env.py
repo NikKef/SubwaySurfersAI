@@ -3,8 +3,10 @@ from __future__ import annotations
 import io
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, Tuple, Optional
 
+import cv2
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
@@ -40,6 +42,10 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     action_coords: Dict[int, Tuple[int, int, int, int]] = field(
         default_factory=lambda: DEFAULT_ACTION_COORDS.copy()
     )
+    menu_template_path: Optional[Path] = Path("templates/menu.png")
+    crash_template_path: Optional[Path] = Path("templates/crash.png")
+    menu_template: Optional[np.ndarray] = field(init=False, default=None)
+    crash_template: Optional[np.ndarray] = field(init=False, default=None)
 
     metadata = {"render_modes": ["rgb_array"]}
 
@@ -54,6 +60,15 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         )
         self.action_space = spaces.Discrete(len(self.action_coords))
 
+        if self.menu_template_path and Path(self.menu_template_path).exists():
+            self.menu_template = cv2.imread(
+                str(self.menu_template_path), cv2.IMREAD_GRAYSCALE
+            )
+        if self.crash_template_path and Path(self.crash_template_path).exists():
+            self.crash_template = cv2.imread(
+                str(self.crash_template_path), cv2.IMREAD_GRAYSCALE
+            )
+
     # ------------------------------------------------------------------
     # ------------------------------------------------------------------
     def _capture_raw(self) -> Image.Image:
@@ -65,11 +80,22 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         image = image.resize(self.frame_size, Image.BILINEAR)
         return np.asarray(image, dtype=np.uint8)
 
+    def _match_template(
+        self, image: Image.Image, template: np.ndarray, threshold: float = 0.9
+    ) -> bool:
+        img_gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
+        res = cv2.matchTemplate(img_gray, template, cv2.TM_CCOEFF_NORMED)
+        return float(res.max()) >= threshold
+
     def _is_menu(self, image: Image.Image) -> bool:
+        if self.menu_template is not None:
+            return self._match_template(image, self.menu_template)
         r, g, b = image.getpixel(PLAY_BUTTON_COORD)
         return g > 150 and r < 100 and b < 100
 
     def _is_crash(self, image: Image.Image) -> bool:
+        if self.crash_template is not None:
+            return self._match_template(image, self.crash_template)
         r, g, b = image.getpixel(CRASH_DISMISS_COORD)
         return r > 200 and g < 100 and b < 100
 

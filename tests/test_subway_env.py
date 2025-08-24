@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 from unittest.mock import Mock
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -63,3 +64,22 @@ def test_step_detects_crash_and_skips():
     obs, reward, terminated, truncated, info = env.step(0)
     controller.tap.assert_called_once_with(520, 1700)
     assert terminated is True
+
+
+def test_template_matching_detects_menu(tmp_path):
+    # Create a base image with a distinctive block
+    base = np.zeros((50, 50, 3), dtype=np.uint8)
+    base[10:20, 10:20] = (0, 255, 0)
+    template = base[10:20, 10:20]
+
+    tmpl_path = tmp_path / "menu.png"
+    Image.fromarray(template).save(tmpl_path)
+
+    controller = Mock(spec=ADBController)
+    buf = io.BytesIO()
+    Image.fromarray(base).save(buf, format="PNG")
+    controller.screencap.return_value = buf.getvalue()
+
+    env = SubwaySurfersEnv(controller=controller, menu_template_path=tmpl_path)
+    image = Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
+    assert env._is_menu(image) is True

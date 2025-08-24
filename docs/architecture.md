@@ -7,8 +7,8 @@ This document will track design decisions and architecture diagrams for the Subw
     cross-platform screen capture and input events.
   - `SubwaySurfersEnv` exposes a Gymnasium-compatible interface built on top of
     `ADBController` for training and evaluation. It automatically taps the
-    menu **PLAY** button and dismisses the *Save Me?* dialog using hard-coded
-    coordinates.
+    menu **PLAY** button and dismisses the *Save Me?* dialog using template
+    matching (falling back to color checks if templates are missing).
 - **Agent**: Reinforcement learning algorithms (starting with DQN) implemented in PyTorch.
   - `DQNAgent` wraps the Stable-Baselines3 DQN implementation and provides a
     small API for training and action selection.
