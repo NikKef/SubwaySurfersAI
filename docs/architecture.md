@@ -8,4 +8,8 @@ This document will track design decisions and architecture diagrams for the Subw
   - `SubwaySurfersEnv` exposes a Gymnasium-compatible interface built on top of
     `ADBController` for training and evaluation.
 - **Agent**: Reinforcement learning algorithms (starting with DQN) implemented in PyTorch.
+  - `DQNAgent` wraps the Stable-Baselines3 DQN implementation and provides a
+    small API for training and action selection.
 - **Training**: Scripts and utilities to optimize the agent.
+  - `run_training.py` reads hyper-parameters from a YAML config and saves the
+    trained model for later evaluation.

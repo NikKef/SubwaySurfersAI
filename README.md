@@ -43,6 +43,21 @@ pre-commit install
 pre-commit run --files $(git ls-files '*.py')
 ```
 
+### 6. Train the baseline agent
+
+With the emulator running and *Subway Surfers* open, launch training:
+
+```bash
+python scripts/run_training.py --config configs/default.yaml --model-path models/dqn_subway_agent
+```
+
+### 7. Play using a trained model
+
+After training, watch the agent play:
+
+```bash
+python scripts/play_agent.py --model-path models/dqn_subway_agent
+```
 ## Project Structure
 
 ```
