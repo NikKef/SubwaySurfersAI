@@ -1,0 +1,6 @@
+# Default hyper-parameters for training
+batch_size: 32
+learning_rate: 3e-4
+gamma: 0.99
+buffer_size: 100000
+train_steps: 1000000
