@@ -12,6 +12,7 @@ from typing import Any
 
 from gymnasium import Env
 from stable_baselines3 import DQN
+from stable_baselines3.common.callbacks import BaseCallback
 
 
 class DQNAgent:
@@ -41,9 +42,27 @@ class DQNAgent:
             policy, env, verbose=dqn_kwargs.pop("verbose", 0), **dqn_kwargs
         )
 
-    def train(self, total_timesteps: int) -> None:
-        """Train the agent for ``total_timesteps`` environment steps."""
-        self.model.learn(total_timesteps=total_timesteps)
+    def train(
+        self, total_timesteps: int, *, callback: BaseCallback | None = None
+    ) -> None:
+        """Train the agent for ``total_timesteps`` environment steps.
+
+        Parameters
+        ----------
+        total_timesteps:
+            Number of environment steps to train for.
+        callback:
+            Optional Stable-Baselines3 callback (e.g. for checkpointing).
+        """
+
+        # ``reset_num_timesteps=False`` allows seamless continuation when
+        # calling ``learn`` multiple times (e.g. when resuming from a
+        # checkpoint).
+        self.model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            reset_num_timesteps=False,
+        )
 
     def act(self, observation: Any) -> int:
         """Return the action selected by the current policy for ``observation``."""

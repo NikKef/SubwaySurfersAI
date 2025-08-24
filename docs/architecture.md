@@ -11,5 +11,8 @@ This document will track design decisions and architecture diagrams for the Subw
   - `DQNAgent` wraps the Stable-Baselines3 DQN implementation and provides a
     small API for training and action selection.
 - **Training**: Scripts and utilities to optimize the agent.
-  - `run_training.py` reads hyper-parameters from a YAML config and saves the
-    trained model for later evaluation.
+  - `run_training.py` reads hyper-parameters from a YAML config, prints
+    progress during training, and periodically saves checkpoints so runs can be
+    resumed seamlessly.
+  - `find_play_button.py` captures a screenshot and reports click coordinates to
+    help identify UI elements like the green PLAY button.

@@ -51,6 +51,11 @@ With the emulator running and *Subway Surfers* open, launch training:
 python scripts/run_training.py --config configs/default.yaml --model-path models/dqn_subway_agent
 ```
 
+The script prints training progress and automatically saves checkpoints under
+`models/checkpoints/`. If a model or checkpoint already exists, training
+resumes from the latest state and continues with the correct learning rate
+schedules.
+
 ### 7. Play using a trained model
 
 After training, watch the agent play:
@@ -71,6 +76,12 @@ python scripts/play_agent.py --model-path models/dqn_subway_agent
 ├── tests/            # Unit tests
 └── docs/             # Additional documentation
 ```
+
+## Helper utilities
+
+- `scripts/find_play_button.py` — capture the emulator screen and print the
+  coordinates of the pixel you click. Use this to determine the location of the
+  green **PLAY** button so the agent can automatically tap it before each run.
 
 ## Notes
 
