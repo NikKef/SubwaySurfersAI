@@ -85,9 +85,13 @@ python scripts/play_agent.py --model-path models/dqn_subway_agent
   `(520, 1700)`. Use this script to adjust these coordinates for your device.
 - `scripts/capture_template.py` — save the current emulator screen to a PNG
   file. Capture reference images of the menu and crash screens and store them
-  as `templates/menu.png` and `templates/crash.png`; the environment will use
+  as `templates/menu_full.png` and `templates/crash_full.png`; the environment will use
   template matching to detect when it should tap the PLAY button or dismiss
   the *Save Me?* dialog.
+
+During play and training, the environment logs the current game state (menu,
+playing, or crashed) to the terminal every couple of seconds, which helps
+diagnose whether template matching is working as expected.
 
 ## Notes
 

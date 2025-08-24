@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 from PIL import Image
+import logging
 
 from src.env import SubwaySurfersEnv, ADBController
 
@@ -83,3 +84,12 @@ def test_template_matching_detects_menu(tmp_path):
     env = SubwaySurfersEnv(controller=controller, menu_template_path=tmpl_path)
     image = Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
     assert env._is_menu(image) is True
+
+
+def test_log_state_reports_menu(caplog):
+    controller = Mock(spec=ADBController)
+    env = SubwaySurfersEnv(controller=controller)
+    image = Image.new("RGB", (1080, 2400), (0, 255, 0))
+    with caplog.at_level(logging.INFO):
+        env._log_state(image)
+    assert "Game state: menu" in caplog.text

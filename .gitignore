@@ -70,7 +70,8 @@ Thumbs.db
 *.obb
 
 # Local screenshot templates
-templates/
+templates/*
+!templates/.gitkeep
 
 # Secrets
 .env

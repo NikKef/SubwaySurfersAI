@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+import logging
 
 import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -45,6 +46,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO)
     args = parse_args()
 
     with args.config.open() as fh:

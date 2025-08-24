@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+import logging
 
 # Allow running as a script without installing the package
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO)
     args = parse_args()
 
     env = SubwaySurfersEnv()

@@ -5,7 +5,7 @@ screen for template matching. Run while the emulator displays the desired
 screen:
 
 ```
-python scripts/capture_template.py templates/menu.png
+python scripts/capture_template.py templates/menu_full.png
 ```
 
 The script writes a PNG file to the given path.

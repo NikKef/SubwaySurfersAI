@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Tuple, Optional
+import logging
 
 import cv2
 import gymnasium as gym
@@ -13,6 +14,8 @@ from gymnasium import spaces
 from PIL import Image
 
 from .adb_controller import ADBController
+
+LOGGER = logging.getLogger(__name__)
 
 # Default swipe coordinates for a 1080x2400 portrait emulator screen.
 # Values are (x1, y1, x2, y2).
@@ -33,8 +36,11 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     """Gymnasium-compatible environment for Subway Surfers.
 
     The environment communicates with an Android emulator via ``ADBController``.
-    Observations are RGB frames resized to ``frame_size``.  Actions are discrete
-    swipes: left, right, jump, roll.
+    Observations are RGB frames resized to ``frame_size``. Actions are discrete
+    swipes: left, right, jump, roll. If ``templates/menu_full.png`` and
+    ``templates/crash_full.png`` exist, they are used for template matching to
+    detect the menu and crash screens. The environment logs the detected game
+    state every ``state_log_interval`` seconds.
     """
 
     controller: Optional[ADBController] = None
@@ -42,10 +48,12 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     action_coords: Dict[int, Tuple[int, int, int, int]] = field(
         default_factory=lambda: DEFAULT_ACTION_COORDS.copy()
     )
-    menu_template_path: Optional[Path] = Path("templates/menu.png")
-    crash_template_path: Optional[Path] = Path("templates/crash.png")
+    menu_template_path: Optional[Path] = Path("templates/menu_full.png")
+    crash_template_path: Optional[Path] = Path("templates/crash_full.png")
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
+    state_log_interval: float = 2.0
+    _last_state_log: float = field(init=False, default_factory=lambda: 0.0)
 
     metadata = {"render_modes": ["rgb_array"]}
 
@@ -99,10 +107,23 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         r, g, b = image.getpixel(CRASH_DISMISS_COORD)
         return r > 200 and g < 100 and b < 100
 
+    def _log_state(self, image: Image.Image) -> None:
+        now = time.time()
+        if now - self._last_state_log < self.state_log_interval:
+            return
+        state = "playing"
+        if self._is_crash(image):
+            state = "crashed"
+        elif self._is_menu(image):
+            state = "menu"
+        LOGGER.info("Game state: %s", state)
+        self._last_state_log = now
+
     def _ensure_playing(self) -> None:
         """Press buttons to ensure the game is in a running state."""
         while True:
             img = self._capture_raw()
+            self._log_state(img)
             if self._is_crash(img):
                 self.controller.tap(*CRASH_DISMISS_COORD)
                 time.sleep(1)
@@ -121,7 +142,9 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
         self._ensure_playing()
-        observation = self._get_frame()
+        image = self._capture_raw()
+        self._log_state(image)
+        observation = self._preprocess(image)
         return observation, {}
 
     def step(self, action: int):
@@ -131,6 +154,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         self.controller.swipe(x1, y1, x2, y2)
         image = self._capture_raw()
         observation = self._preprocess(image)
+        self._log_state(image)
         terminated = False
         if self._is_crash(image):
             self.controller.tap(*CRASH_DISMISS_COORD)
