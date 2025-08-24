@@ -80,8 +80,9 @@ python scripts/play_agent.py --model-path models/dqn_subway_agent
 ## Helper utilities
 
 - `scripts/find_play_button.py` — capture the emulator screen and print the
-  coordinates of the pixel you click. Use this to determine the location of the
-  green **PLAY** button so the agent can automatically tap it before each run.
+  coordinates of the pixel you click. By default the environment presses the
+  **PLAY** button at `(854, 2287)` and dismisses the *Save Me?* dialog at
+  `(520, 1700)`. Use this script to adjust these coordinates for your device.
 
 ## Notes
 

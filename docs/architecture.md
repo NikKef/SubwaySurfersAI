@@ -6,7 +6,9 @@ This document will track design decisions and architecture diagrams for the Subw
   - `ADBController` provides a thin subprocess-based wrapper around the `adb` binary for
     cross-platform screen capture and input events.
   - `SubwaySurfersEnv` exposes a Gymnasium-compatible interface built on top of
-    `ADBController` for training and evaluation.
+    `ADBController` for training and evaluation. It automatically taps the
+    menu **PLAY** button and dismisses the *Save Me?* dialog using hard-coded
+    coordinates.
 - **Agent**: Reinforcement learning algorithms (starting with DQN) implemented in PyTorch.
   - `DQNAgent` wraps the Stable-Baselines3 DQN implementation and provides a
     small API for training and action selection.

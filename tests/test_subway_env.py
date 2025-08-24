@@ -9,8 +9,10 @@ from PIL import Image
 from src.env import SubwaySurfersEnv, ADBController
 
 
-def _fake_png(color: int) -> bytes:
-    img = Image.new("RGB", (100, 100), (color, color, color))
+def _fake_png(color) -> bytes:
+    if isinstance(color, int):
+        color = (color, color, color)
+    img = Image.new("RGB", (1080, 2400), color)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -47,3 +49,17 @@ def test_step_swipe_called(action, coords):
     assert terminated is False
     assert truncated is False
     assert info == {}
+
+
+def test_step_detects_crash_and_skips():
+    controller = Mock(spec=ADBController)
+    controller.screencap.side_effect = [
+        _fake_png(0),  # ensure_playing
+        _fake_png(0),  # reset frame
+        _fake_png((255, 0, 0)),  # crash frame
+    ]
+    env = SubwaySurfersEnv(controller=controller)
+    env.reset()
+    obs, reward, terminated, truncated, info = env.step(0)
+    controller.tap.assert_called_once_with(520, 1700)
+    assert terminated is True

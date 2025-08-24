@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import time
 from dataclasses import dataclass, field
 from typing import Dict, Tuple, Optional
 
@@ -19,6 +20,10 @@ DEFAULT_ACTION_COORDS: Dict[int, Tuple[int, int, int, int]] = {
     2: (540, 1600, 540, 900),  # jump
     3: (540, 1600, 540, 2000),  # roll
 }
+
+# UI element coordinates for a 1080x2400 screen.
+PLAY_BUTTON_COORD = (854, 2287)
+CRASH_DISMISS_COORD = (520, 1700)
 
 
 @dataclass
@@ -50,16 +55,46 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         self.action_space = spaces.Discrete(len(self.action_coords))
 
     # ------------------------------------------------------------------
-    def _get_frame(self) -> np.ndarray:
-        """Capture and preprocess the current emulator frame."""
+    # ------------------------------------------------------------------
+    def _capture_raw(self) -> Image.Image:
+        """Return the current emulator frame as a PIL image."""
         png_bytes = self.controller.screencap()
-        image = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+        return Image.open(io.BytesIO(png_bytes)).convert("RGB")
+
+    def _preprocess(self, image: Image.Image) -> np.ndarray:
         image = image.resize(self.frame_size, Image.BILINEAR)
         return np.asarray(image, dtype=np.uint8)
+
+    def _is_menu(self, image: Image.Image) -> bool:
+        r, g, b = image.getpixel(PLAY_BUTTON_COORD)
+        return g > 150 and r < 100 and b < 100
+
+    def _is_crash(self, image: Image.Image) -> bool:
+        r, g, b = image.getpixel(CRASH_DISMISS_COORD)
+        return r > 200 and g < 100 and b < 100
+
+    def _ensure_playing(self) -> None:
+        """Press buttons to ensure the game is in a running state."""
+        while True:
+            img = self._capture_raw()
+            if self._is_crash(img):
+                self.controller.tap(*CRASH_DISMISS_COORD)
+                time.sleep(1)
+                continue
+            if self._is_menu(img):
+                self.controller.tap(*PLAY_BUTTON_COORD)
+                time.sleep(1)
+                continue
+            break
+
+    def _get_frame(self) -> np.ndarray:
+        image = self._capture_raw()
+        return self._preprocess(image)
 
     # Gymnasium API ----------------------------------------------------
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
+        self._ensure_playing()
         observation = self._get_frame()
         return observation, {}
 
@@ -68,9 +103,13 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             raise gym.error.InvalidAction(f"Invalid action: {action}")
         x1, y1, x2, y2 = self.action_coords[action]
         self.controller.swipe(x1, y1, x2, y2)
-        observation = self._get_frame()
-        reward = 0.0
+        image = self._capture_raw()
+        observation = self._preprocess(image)
         terminated = False
+        if self._is_crash(image):
+            self.controller.tap(*CRASH_DISMISS_COORD)
+            terminated = True
+        reward = 0.0
         truncated = False
         info: Dict[str, float] = {}
         return observation, reward, terminated, truncated, info
