@@ -92,19 +92,33 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         self, image: Image.Image, template: np.ndarray, threshold: float = 0.9
     ) -> bool:
         img_gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
-        res = cv2.matchTemplate(img_gray, template, cv2.TM_CCOEFF_NORMED)
+        method = cv2.TM_CCOEFF_NORMED
+        if float(template.std()) == 0.0:
+            res = cv2.matchTemplate(img_gray, template, cv2.TM_SQDIFF_NORMED)
+            return float(res.min()) <= (1 - threshold)
+        res = cv2.matchTemplate(img_gray, template, method)
         return float(res.max()) >= threshold
 
     def _is_menu(self, image: Image.Image) -> bool:
-        if self.menu_template is not None:
-            return self._match_template(image, self.menu_template)
-        r, g, b = image.getpixel(PLAY_BUTTON_COORD)
+        if self.menu_template is not None and self._match_template(
+            image, self.menu_template
+        ):
+            return True
+        try:
+            r, g, b = image.getpixel(PLAY_BUTTON_COORD)
+        except IndexError:
+            return False
         return g > 150 and r < 100 and b < 100
 
     def _is_crash(self, image: Image.Image) -> bool:
-        if self.crash_template is not None:
-            return self._match_template(image, self.crash_template)
-        r, g, b = image.getpixel(CRASH_DISMISS_COORD)
+        if self.crash_template is not None and self._match_template(
+            image, self.crash_template
+        ):
+            return True
+        try:
+            r, g, b = image.getpixel(CRASH_DISMISS_COORD)
+        except IndexError:
+            return False
         return r > 200 and g < 100 and b < 100
 
     def _log_state(self, image: Image.Image) -> None:
