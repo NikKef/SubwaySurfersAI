@@ -22,7 +22,6 @@ pip install -r requirements.txt
 
 Install [Android Studio](https://developer.android.com/studio) and configure a device with *Subway Surfers*. Make sure the `adb` command is available in your PATH.
 
-### 4. Run formatting and linting
 
 The project uses [pre-commit](https://pre-commit.com/) hooks for formatting and linting.
 
@@ -49,4 +48,3 @@ pre-commit run --files $(git ls-files '*.py')
 - Keep API keys or other secrets in a local `.env` file (ignored by git).
 - The repository does **not** include any game assets.
 - For sensitive operations (e.g., downloading the game APK), run commands locally and do not commit them.
-
