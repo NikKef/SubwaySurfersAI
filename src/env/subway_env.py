@@ -54,6 +54,9 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
     _last_state_log: float = field(init=False, default_factory=lambda: 0.0)
+    _last_frame_time: float = field(init=False, default_factory=lambda: 0.0)
+    _elapsed_play_time: float = field(init=False, default_factory=lambda: 0.0)
+    _menu_since: Optional[float] = field(init=False, default=None)
 
     metadata = {"render_modes": ["rgb_array"]}
 
@@ -125,24 +128,28 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         now = time.time()
         if now - self._last_state_log < self.state_log_interval:
             return
-        state = "playing"
-        if self._is_crash(image):
-            state = "crashed"
-        elif self._is_menu(image):
-            state = "menu"
+        state = self._detect_state(image)
         LOGGER.info("Game state: %s", state)
         self._last_state_log = now
+
+    def _detect_state(self, image: Image.Image) -> str:
+        if self._is_crash(image):
+            return "crashed"
+        if self._is_menu(image):
+            return "menu"
+        return "playing"
 
     def _ensure_playing(self) -> None:
         """Press buttons to ensure the game is in a running state."""
         while True:
             img = self._capture_raw()
+            state = self._detect_state(img)
             self._log_state(img)
-            if self._is_crash(img):
+            if state == "crashed":
                 self.controller.tap(*CRASH_DISMISS_COORD)
                 time.sleep(1)
                 continue
-            if self._is_menu(img):
+            if state == "menu":
                 self.controller.tap(*PLAY_BUTTON_COORD)
                 time.sleep(1)
                 continue
@@ -157,26 +164,68 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         super().reset(seed=seed)
         self._ensure_playing()
         image = self._capture_raw()
+        self._last_frame_time = time.time()
+        self._elapsed_play_time = 0.0
+        self._menu_since = None
         self._log_state(image)
         observation = self._preprocess(image)
         return observation, {}
 
     def step(self, action: int):
+        image = self._capture_raw()
+        state = self._detect_state(image)
+        now = time.time()
+        self._log_state(image)
+
+        # Handle non-playing states before executing the action.
+        if state == "menu":
+            if self._menu_since is None:
+                self._menu_since = now
+            elif now - self._menu_since > 5.0:
+                self.controller.tap(*PLAY_BUTTON_COORD)
+                self._menu_since = now
+            observation = self._preprocess(image)
+            self._last_frame_time = now
+            return observation, 0.0, False, False, {}
+
+        if state == "crashed":
+            self.controller.tap(*CRASH_DISMISS_COORD)
+            observation = self._preprocess(image)
+            self._last_frame_time = now
+            info = {"time_survived": self._elapsed_play_time}
+            self._elapsed_play_time = 0.0
+            self._menu_since = None
+            return observation, 0.0, True, False, info
+
+        # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
             raise gym.error.InvalidAction(f"Invalid action: {action}")
         x1, y1, x2, y2 = self.action_coords[action]
         self.controller.swipe(x1, y1, x2, y2)
+
         image = self._capture_raw()
-        observation = self._preprocess(image)
+        state = self._detect_state(image)
+        now2 = time.time()
         self._log_state(image)
+        reward = max(now2 - self._last_frame_time, 0.0)
+        self._elapsed_play_time += reward
+        self._last_frame_time = now2
+
         terminated = False
-        if self._is_crash(image):
+        if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
             terminated = True
-        reward = 0.0
-        truncated = False
-        info: Dict[str, float] = {}
-        return observation, reward, terminated, truncated, info
+        if state == "menu":
+            self._menu_since = now2
+        else:
+            self._menu_since = None
+
+        observation = self._preprocess(image)
+        info: Dict[str, float] = {"time_survived": self._elapsed_play_time}
+        if terminated:
+            info = {"time_survived": self._elapsed_play_time}
+            self._elapsed_play_time = 0.0
+        return observation, reward, terminated, False, info
 
     def render(self) -> np.ndarray:
         return self._get_frame()

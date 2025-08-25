@@ -9,6 +9,7 @@ import logging
 
 import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.logger import configure
 
 # Allow running as a script without installing the package
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,14 +69,20 @@ def main() -> None:
 
     env = SubwaySurfersEnv()
 
+    log_dir = model_file.parent / "tb"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logger = configure(str(log_dir), ["tensorboard", "stdout"])
+
     # Load existing model or checkpoint if available.
     if model_file.exists():
         agent = DQNAgent.load(str(model_file), env)
+        agent.model.set_logger(logger)
         print(f"Loaded existing model from {model_file}")
     else:
         latest = find_latest_checkpoint(model_file)
         if latest is not None:
             agent = DQNAgent.load(str(latest), env)
+            agent.model.set_logger(logger)
             print(f"Loaded checkpoint {latest}")
         else:
             agent = DQNAgent(
@@ -85,6 +92,7 @@ def main() -> None:
                 gamma=gamma,
                 batch_size=batch_size,
                 verbose=1,
+                tensorboard_log=str(log_dir),
             )
             print("Initialized new agent")
 

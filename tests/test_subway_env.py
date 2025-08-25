@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import time
 from unittest.mock import Mock
 
 import numpy as np
@@ -9,6 +10,7 @@ from PIL import Image
 import logging
 
 from src.env import SubwaySurfersEnv, ADBController
+from src.env.subway_env import PLAY_BUTTON_COORD
 
 
 def _fake_png(color) -> bytes:
@@ -38,12 +40,17 @@ def test_reset_returns_observation():
         (3, (540, 1600, 540, 2000)),
     ],
 )
-def test_step_swipe_called(action, coords):
+def test_step_swipe_called(monkeypatch, action, coords):
     controller = Mock(spec=ADBController)
-    controller.screencap.return_value = _fake_png(0)
+    controller.screencap.side_effect = [
+        _fake_png(0),  # ensure_playing
+        _fake_png(0),  # reset frame
+        _fake_png(0),  # step start
+        _fake_png(255),  # step result
+    ]
+    monkeypatch.setattr(time, "time", lambda: 0.0)
     env = SubwaySurfersEnv(controller=controller)
     env.reset()
-    controller.screencap.return_value = _fake_png(255)
     obs, reward, terminated, truncated, info = env.step(action)
     controller.swipe.assert_called_once_with(*coords)
     assert obs.shape == env.observation_space.shape
@@ -53,17 +60,19 @@ def test_step_swipe_called(action, coords):
     assert info == {}
 
 
-def test_step_detects_crash_and_skips():
+def test_step_detects_crash_and_skips(monkeypatch):
     controller = Mock(spec=ADBController)
     controller.screencap.side_effect = [
         _fake_png(0),  # ensure_playing
         _fake_png(0),  # reset frame
+        _fake_png(0),  # step start
         _fake_png((255, 0, 0)),  # crash frame
     ]
+    monkeypatch.setattr(time, "time", lambda: 0.0)
     env = SubwaySurfersEnv(controller=controller)
     env.reset()
     obs, reward, terminated, truncated, info = env.step(0)
-    controller.tap.assert_called_once_with(520, 1700)
+    controller.tap.assert_called_with(520, 1700)
     assert terminated is True
 
 
@@ -93,3 +102,16 @@ def test_log_state_reports_menu(caplog):
     with caplog.at_level(logging.INFO):
         env._log_state(image)
     assert "Game state: menu" in caplog.text
+
+
+def test_menu_retry_after_timeout(monkeypatch):
+    controller = Mock(spec=ADBController)
+    controller.screencap.return_value = _fake_png((0, 255, 0))
+    env = SubwaySurfersEnv(controller=controller)
+    env.reset()
+
+    times = iter([0.0, 0.0, 6.0, 6.0])
+    monkeypatch.setattr(time, "time", lambda: next(times))
+    env.step(0)  # first menu detection, set _menu_since
+    env.step(0)  # after 6s, should tap again
+    controller.tap.assert_called_with(*PLAY_BUTTON_COORD)

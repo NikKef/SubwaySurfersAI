@@ -54,7 +54,15 @@ python scripts/run_training.py --config configs/default.yaml --model-path models
 The script prints training progress and automatically saves checkpoints under
 `models/checkpoints/`. If a model or checkpoint already exists, training
 resumes from the latest state and continues with the correct learning rate
-schedules.
+schedules. Rewards reflect **time survived while the game is actually playing**;
+time spent in menus or on crash screens does not contribute to the reward or
+episode length.
+
+To visualize learning curves, launch TensorBoard in another terminal:
+
+```bash
+tensorboard --logdir models/tb
+```
 
 ### 7. Play using a trained model
 
@@ -92,6 +100,8 @@ python scripts/play_agent.py --model-path models/dqn_subway_agent
 During play and training, the environment logs the current game state (menu,
 playing, or crashed) to the terminal every couple of seconds, which helps
 diagnose whether template matching is working as expected.
+If the agent remains on the menu for more than five seconds, it automatically
+attempts to tap the **PLAY** button again.
 
 ## Notes
 
