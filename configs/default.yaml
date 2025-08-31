@@ -3,8 +3,12 @@ batch_size: 32
 learning_rate: 3e-4
 gamma: 0.99
 buffer_size: 100000
+train_steps: 1000000
+checkpoint_freq: 10000
+frame_stack: 4
 train_steps: 2000000
 checkpoint_freq: 10000
 hidden_sizes: [256, 256]
 dueling: true
 double_q: true
+frame_stack: 4

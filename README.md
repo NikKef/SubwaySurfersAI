@@ -45,7 +45,9 @@ pre-commit run --files $(git ls-files '*.py')
 
 ### 6. Train the baseline agent
 
-With the emulator running and *Subway Surfers* open, launch training:
+With the emulator running and *Subway Surfers* open, launch training. The
+default configuration stacks four consecutive **grayscale** frames to provide
+temporal context for the agent:
 
 ```bash
 python scripts/run_training.py --config configs/default.yaml --model-path models/dqn_subway_agent

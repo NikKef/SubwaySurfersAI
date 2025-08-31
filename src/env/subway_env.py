@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Deque, Dict, Tuple, Optional
 import logging
+from collections import deque
 
 import cv2
 import gymnasium as gym
@@ -52,6 +53,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     )
     menu_template_path: Optional[Path] = Path("templates/menu_full.png")
     crash_template_path: Optional[Path] = Path("templates/crash_full.png")
+    frame_stack: int = 1
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
@@ -59,13 +61,14 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     _last_frame_time: float = field(init=False, default_factory=lambda: 0.0)
     _elapsed_play_time: float = field(init=False, default_factory=lambda: 0.0)
     _menu_since: Optional[float] = field(init=False, default=None)
-    _frames: Deque[np.ndarray] = field(init=False)
+    _frames: deque[np.ndarray] = field(init=False, repr=False)
 
     metadata = {"render_modes": ["rgb_array"]}
 
     def __post_init__(self) -> None:
         self.controller = self.controller or ADBController()
         width, height = self.frame_size
+        self._frames = deque(maxlen=self.frame_stack)
         self.observation_space = spaces.Box(
             low=0,
             high=255,
@@ -92,7 +95,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         return Image.open(io.BytesIO(png_bytes)).convert("RGB")
 
     def _preprocess(self, image: Image.Image) -> np.ndarray:
-        image = image.resize(self.frame_size, Image.BILINEAR).convert("L")
+        image = image.convert("L").resize(self.frame_size, Image.BILINEAR)
         return np.asarray(image, dtype=np.uint8)
 
     def _match_template(
@@ -172,6 +175,10 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         super().reset(seed=seed)
         self._ensure_playing()
         image = self._capture_raw()
+        frame = self._preprocess(image)
+        self._frames.clear()
+        for _ in range(self.frame_stack):
+            self._frames.append(frame)
         self._last_frame_time = time.time()
         self._elapsed_play_time = 0.0
         self._menu_since = None
@@ -196,13 +203,15 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self._menu_since = now
             frame = self._preprocess(image)
             self._frames.append(frame)
+            observation = np.stack(list(self._frames), axis=-1)
             self._last_frame_time = now
-            return self._get_observation(), 0.0, False, False, {}
+            return observation, 0.0, False, False, {}
 
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
             frame = self._preprocess(image)
             self._frames.append(frame)
+            observation = np.stack(list(self._frames), axis=-1)
             self._last_frame_time = now
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
@@ -234,6 +243,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
 
         frame = self._preprocess(image)
         self._frames.append(frame)
+        observation = np.stack(list(self._frames), axis=-1)
         info: Dict[str, float] = {"time_survived": self._elapsed_play_time}
         if terminated:
             info = {"time_survived": self._elapsed_play_time}

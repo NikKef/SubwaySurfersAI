@@ -61,6 +61,7 @@ def main() -> None:
     gamma = float(cfg["gamma"])
     batch_size = int(cfg["batch_size"])
     train_steps = int(cfg["train_steps"])
+    frame_stack = int(cfg.get("frame_stack", 1))
     hidden_sizes = cfg.get("hidden_sizes", [256, 256])
     dueling = bool(cfg.get("dueling", True))
     double_q = bool(cfg.get("double_q", True))
@@ -70,7 +71,7 @@ def main() -> None:
     if not model_file.suffix:
         model_file = model_file.with_suffix(".zip")
 
-    env = SubwaySurfersEnv()
+    env = SubwaySurfersEnv(frame_stack=frame_stack)
 
     log_dir = model_file.parent / "tb"
     log_dir.mkdir(parents=True, exist_ok=True)

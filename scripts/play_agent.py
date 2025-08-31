@@ -24,6 +24,12 @@ def parse_args() -> argparse.Namespace:
         default=Path("models/dqn_subway_agent"),
         help="Path to the trained model",
     )
+    parser.add_argument(
+        "--frame-stack",
+        type=int,
+        default=4,
+        help="Number of stacked grayscale frames expected by the model",
+    )
     return parser.parse_args()
 
 
@@ -31,7 +37,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     args = parse_args()
 
-    env = SubwaySurfersEnv()
+    env = SubwaySurfersEnv(frame_stack=args.frame_stack)
     agent = DQNAgent.load(str(args.model_path), env)
 
     obs, _ = env.reset()

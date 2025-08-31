@@ -7,6 +7,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
+
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 from src.agent import DQNAgent
