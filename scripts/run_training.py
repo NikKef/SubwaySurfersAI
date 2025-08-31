@@ -61,6 +61,9 @@ def main() -> None:
     gamma = float(cfg["gamma"])
     batch_size = int(cfg["batch_size"])
     train_steps = int(cfg["train_steps"])
+    hidden_sizes = cfg.get("hidden_sizes", [256, 256])
+    dueling = bool(cfg.get("dueling", True))
+    double_q = bool(cfg.get("double_q", True))
 
     # Resolve model file (Stable-Baselines appends ``.zip`` if missing).
     model_file = args.model_path
@@ -93,6 +96,9 @@ def main() -> None:
                 batch_size=batch_size,
                 verbose=1,
                 tensorboard_log=str(log_dir),
+                hidden_sizes=hidden_sizes,
+                dueling=dueling,
+                double_q=double_q,
             )
             print("Initialized new agent")
 
