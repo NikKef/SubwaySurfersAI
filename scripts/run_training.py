@@ -80,12 +80,20 @@ def main() -> None:
     if model_file.exists():
         agent = DQNAgent.load(str(model_file), env)
         agent.model.set_logger(logger)
+        replay_path = model_file.with_name(f"{model_file.stem}_replay_buffer.pkl")
+        if replay_path.exists():
+            agent.model.load_replay_buffer(str(replay_path))
+            print(f"Loaded replay buffer from {replay_path}")
         print(f"Loaded existing model from {model_file}")
     else:
         latest = find_latest_checkpoint(model_file)
         if latest is not None:
             agent = DQNAgent.load(str(latest), env)
             agent.model.set_logger(logger)
+            replay_path = latest.with_name(f"{latest.stem}_replay_buffer.pkl")
+            if replay_path.exists():
+                agent.model.load_replay_buffer(str(replay_path))
+                print(f"Loaded replay buffer from {replay_path}")
             print(f"Loaded checkpoint {latest}")
         else:
             agent = DQNAgent(
@@ -109,6 +117,7 @@ def main() -> None:
         save_freq=int(cfg.get("checkpoint_freq", 10000)),
         save_path=str(checkpoint_dir),
         name_prefix=model_file.stem,
+        save_replay_buffer=True,
     )
 
     steps_done = agent.model.num_timesteps
@@ -122,7 +131,10 @@ def main() -> None:
         agent.train(steps_remaining, callback=checkpoint_callback)
         model_file.parent.mkdir(parents=True, exist_ok=True)
         agent.save(str(model_file))
+        replay_path = model_file.with_name(f"{model_file.stem}_replay_buffer.pkl")
+        agent.model.save_replay_buffer(str(replay_path))
         print(f"Saved model to {model_file}")
+        print(f"Saved replay buffer to {replay_path}")
     else:
         print("Target timesteps already reached; skipping training")
 
