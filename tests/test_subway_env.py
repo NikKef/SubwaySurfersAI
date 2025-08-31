@@ -27,7 +27,7 @@ def test_reset_returns_observation():
     controller.screencap.return_value = _fake_png(0)
     env = SubwaySurfersEnv(controller=controller, frame_size=(50, 50))
     obs, info = env.reset()
-    assert obs.shape == (50, 50, 3)
+    assert obs.shape == (50, 50, env.frame_stack)
     assert info == {}
 
 
