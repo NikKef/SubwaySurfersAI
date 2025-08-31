@@ -76,39 +76,40 @@ def main() -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     logger = configure(str(log_dir), ["tensorboard", "stdout"])
 
-    # Load existing model or checkpoint if available.
+    # Load existing model or checkpoint if available.  If the observation space
+    # has changed (e.g. due to different frame stacking), loading will raise a
+    # ``ValueError``.  In that case start from scratch but keep the new
+    # environment settings.
+    agent = None
     if model_file.exists():
-        agent = DQNAgent.load(str(model_file), env)
-        agent.model.set_logger(logger)
-        replay_path = model_file.with_name(f"{model_file.stem}_replay_buffer.pkl")
-        if replay_path.exists():
-            agent.model.load_replay_buffer(str(replay_path))
-            print(f"Loaded replay buffer from {replay_path}")
-        print(f"Loaded existing model from {model_file}")
-    else:
+        try:
+            agent = DQNAgent.load(str(model_file), env)
+            agent.model.set_logger(logger)
+            print(f"Loaded existing model from {model_file}")
+        except ValueError as err:
+            print(f"Could not load {model_file}: {err}\nStarting fresh model")
+
+    if agent is None:
         latest = find_latest_checkpoint(model_file)
         if latest is not None:
-            agent = DQNAgent.load(str(latest), env)
-            agent.model.set_logger(logger)
-            replay_path = latest.with_name(f"{latest.stem}_replay_buffer.pkl")
-            if replay_path.exists():
-                agent.model.load_replay_buffer(str(replay_path))
-                print(f"Loaded replay buffer from {replay_path}")
-            print(f"Loaded checkpoint {latest}")
-        else:
-            agent = DQNAgent(
-                env,
-                learning_rate=learning_rate,
-                buffer_size=buffer_size,
-                gamma=gamma,
-                batch_size=batch_size,
-                verbose=1,
-                tensorboard_log=str(log_dir),
-                hidden_sizes=hidden_sizes,
-                dueling=dueling,
-                double_q=double_q,
-            )
-            print("Initialized new agent")
+            try:
+                agent = DQNAgent.load(str(latest), env)
+                agent.model.set_logger(logger)
+                print(f"Loaded checkpoint {latest}")
+            except ValueError as err:
+                print(f"Could not load {latest}: {err}\nStarting fresh model")
+
+    if agent is None:
+        agent = DQNAgent(
+            env,
+            learning_rate=learning_rate,
+            buffer_size=buffer_size,
+            gamma=gamma,
+            batch_size=batch_size,
+            verbose=1,
+            tensorboard_log=str(log_dir),
+        )
+        print("Initialized new agent")
 
     # Setup checkpointing
     checkpoint_dir = model_file.parent / "checkpoints"

@@ -54,13 +54,11 @@ python scripts/run_training.py --config configs/default.yaml --model-path models
 The script prints training progress and automatically saves checkpoints under
 `models/checkpoints/`. If a model or checkpoint already exists, training
 resumes from the latest state and continues with the correct learning rate
-schedules. The default configuration trains for **2,000,000 steps**, which can
-take many hours (e.g., 8+ hours on a modern desktop GPU).
-If training is interrupted, rerun the same command: the script restores the
-latest checkpoint including the replay buffer and step counter so training
-continues where it left off. Rewards reflect **time survived while the game is
-actually playing**; time spent in menus or on crash screens does not
-contribute to the reward or episode length.
+schedules. If the observation shape has changed (e.g. after enabling frame
+stacking), the existing checkpoint will be ignored and training starts with a
+fresh model. Rewards reflect **time survived while the game is actually
+playing**; time spent in menus or on crash screens does not contribute to the
+reward or episode length.
 
 To visualize learning curves, launch TensorBoard in another terminal:
 
