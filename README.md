@@ -76,6 +76,20 @@ After training, watch the agent play:
 python scripts/play_agent.py --model-path models/dqn_subway_agent
 ```
 
+### 8. Evaluate a trained model
+
+Run a fixed number of episodes and log reward and survival time:
+
+```bash
+python scripts/evaluate_agent.py --model-path models/dqn_subway_agent --episodes 10
+```
+
+Evaluation metrics are written to `models/tb_eval` and can be viewed with:
+
+```bash
+tensorboard --logdir models/tb_eval
+```
+
 ## Project Structure
 
 ```
