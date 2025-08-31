@@ -70,11 +70,24 @@ tensorboard --logdir models/tb
 
 ### 7. Play using a trained model
 
-After training, watch the agent play. Use the same frame-stack setting that the
-model was trained with (defaults to four):
+After training, watch the agent play:
 
 ```bash
-python scripts/play_agent.py --model-path models/dqn_subway_agent --frame-stack 4
+python scripts/play_agent.py --model-path models/dqn_subway_agent
+```
+
+### 8. Evaluate a trained model
+
+Run a fixed number of episodes and log reward and survival time:
+
+```bash
+python scripts/evaluate_agent.py --model-path models/dqn_subway_agent --episodes 10
+```
+
+Evaluation metrics are written to `models/tb_eval` and can be viewed with:
+
+```bash
+tensorboard --logdir models/tb_eval
 ```
 
 ## Project Structure

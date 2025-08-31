@@ -4,7 +4,7 @@ import io
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Deque, Dict, Tuple, Optional
 import logging
 from collections import deque
 
@@ -13,6 +13,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from PIL import Image
+from collections import deque
 
 from .adb_controller import ADBController
 
@@ -46,6 +47,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
 
     controller: Optional[ADBController] = None
     frame_size: Tuple[int, int] = (160, 90)  # (width, height)
+    frame_stack: int = 4
     action_coords: Dict[int, Tuple[int, int, int, int]] = field(
         default_factory=lambda: DEFAULT_ACTION_COORDS.copy()
     )
@@ -74,6 +76,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             dtype=np.uint8,
         )
         self.action_space = spaces.Discrete(len(self.action_coords))
+        self._frames = deque(maxlen=self.frame_stack)
 
         if self.menu_template_path and Path(self.menu_template_path).exists():
             self.menu_template = cv2.imread(
@@ -163,6 +166,10 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         image = self._capture_raw()
         return self._preprocess(image)
 
+    def _get_observation(self) -> np.ndarray:
+        """Return the stacked grayscale frames as an observation tensor."""
+        return np.stack(list(self._frames), axis=-1)
+
     # Gymnasium API ----------------------------------------------------
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
@@ -176,8 +183,11 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         self._elapsed_play_time = 0.0
         self._menu_since = None
         self._log_state(image)
-        observation = np.stack(list(self._frames), axis=-1)
-        return observation, {}
+        frame = self._preprocess(image)
+        self._frames.clear()
+        for _ in range(self.frame_stack):
+            self._frames.append(frame)
+        return self._get_observation(), {}
 
     def step(self, action: int):
         image = self._capture_raw()
@@ -185,7 +195,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         now = time.time()
         self._log_state(image)
 
-        # Handle non-playing states before executing the action.
         if state == "menu":
             if self._menu_since is None:
                 self._menu_since = now
@@ -207,7 +216,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
             self._menu_since = None
-            return observation, 0.0, True, False, info
+            return self._get_observation(), 0.0, True, False, info
 
         # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
@@ -239,7 +248,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         if terminated:
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
-        return observation, reward, terminated, False, info
+        return self._get_observation(), reward, terminated, False, info
 
     def render(self) -> np.ndarray:
         return self._get_frame()
