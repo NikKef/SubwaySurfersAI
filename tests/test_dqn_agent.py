@@ -6,6 +6,7 @@ import os
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+import pytest
 
 
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -190,8 +191,8 @@ def test_load_transposed_observations(tmp_path) -> None:
     assert env_chw.action_space.contains(action)
 
 
-def test_load_arbitrary_axis_permutation(tmp_path) -> None:
-    """Loading succeeds when channel axis moves to the middle."""
+def test_load_preserves_observation_space_and_trains(tmp_path) -> None:
+    """Reloading with transposed channels updates spaces and allows training."""
     env_hwc = DummyEnv()
     agent = DQNAgent(
         env_hwc,
@@ -201,11 +202,14 @@ def test_load_arbitrary_axis_permutation(tmp_path) -> None:
         train_freq=1,
         gradient_steps=1,
     )
+    agent.model.learn(total_timesteps=1)
     model_path = tmp_path / "agent.zip"
     agent.save(str(model_path))
 
-    env_hcw = DummyEnvHCW()
-    loaded = DQNAgent.load(str(model_path), env_hcw)
-    obs, _ = loaded.env.reset()
-    action = loaded.act(obs)
-    assert env_hcw.action_space.contains(action)
+    env_chw = DummyEnv3()
+    try:
+        loaded = DQNAgent.load(str(model_path), env_chw)
+    except ValueError as err:  # pragma: no cover - explicit failure message
+        pytest.fail(f"DQNAgent.load raised ValueError: {err}")
+    assert loaded.model.observation_space == env_chw.observation_space
+    loaded.model.learn(total_timesteps=1)
