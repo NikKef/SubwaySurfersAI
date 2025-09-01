@@ -78,6 +78,26 @@ class DummyEnv3(gym.Env):
         return obs, 0.0, False, False, {}
 
 
+class DummyEnvHCW(gym.Env):
+    """Environment with channel dimension in the middle."""
+
+    metadata = {"render_modes": []}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=(84, 3, 84), dtype=np.uint8
+        )
+        self.action_space = spaces.Discrete(4)
+
+    def reset(self, *, seed: int | None = None, options: dict | None = None):
+        return np.zeros(self.observation_space.shape, dtype=np.uint8), {}
+
+    def step(self, action: int):
+        obs = np.zeros(self.observation_space.shape, dtype=np.uint8)
+        return obs, 0.0, False, False, {}
+
+
 def test_dqn_agent_act() -> None:
     env = DummyEnv()
     agent = DQNAgent(
@@ -168,3 +188,24 @@ def test_load_transposed_observations(tmp_path) -> None:
     obs, _ = env_chw.reset()
     action = loaded.act(obs)
     assert env_chw.action_space.contains(action)
+
+
+def test_load_arbitrary_axis_permutation(tmp_path) -> None:
+    """Loading succeeds when channel axis moves to the middle."""
+    env_hwc = DummyEnv()
+    agent = DQNAgent(
+        env_hwc,
+        policy="CnnPolicy",
+        buffer_size=1,
+        learning_starts=0,
+        train_freq=1,
+        gradient_steps=1,
+    )
+    model_path = tmp_path / "agent.zip"
+    agent.save(str(model_path))
+
+    env_hcw = DummyEnvHCW()
+    loaded = DQNAgent.load(str(model_path), env_hcw)
+    obs, _ = loaded.env.reset()
+    action = loaded.act(obs)
+    assert env_hcw.action_space.contains(action)
