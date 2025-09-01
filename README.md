@@ -59,8 +59,9 @@ resumes from the latest state and continues with the correct learning rate
 schedules. If the observation shape has changed (e.g. after enabling frame
 stacking), the existing checkpoint will be ignored and training starts with a
 fresh model. Rewards reflect **time survived while the game is actually
-playing**; time spent in menus or on crash screens does not contribute to the
-reward or episode length.
+playing**, with a small negative penalty applied when a crash occurs. Time spent
+in menus or on crash screens does not contribute to the reward or episode
+length.
 
 To visualize learning curves, launch TensorBoard in another terminal:
 
