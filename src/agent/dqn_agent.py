@@ -102,8 +102,82 @@ class DQNAgent:
 
     @classmethod
     def load(cls, path: str, env: Env) -> "DQNAgent":
-        """Load a saved agent from ``path`` and attach ``env``."""
-        model = DQN.load(path, env=env)
+        """Load a saved agent from ``path`` and attach ``env``.
+
+        If the observation space of ``env`` differs from the one used when the
+        model was saved (e.g. due to a different number of stacked frames),
+        the underlying convolutional network is adapted so training can
+        continue without starting from scratch.  Additional channels are
+        initialized by copying the final existing channel; surplus channels are
+        discarded.
+        """
+
+        try:
+            # Attempt standard loading with environment which performs a strict
+            # space compatibility check.
+            model = DQN.load(path, env=env)
+        except ValueError:
+            # Fallback: load without env and reshape the first convolutional
+            # layer to match the new number of channels.  This mirrors the
+            # logic Stable-Baselines3 would use but keeps as much of the
+            # pretrained weights as possible.
+            model = DQN.load(path, env=None)
+
+            def _channel_count(shape: tuple[int, ...]) -> int:
+                """Heuristically determine channel dimension of ``shape``."""
+                if not shape:
+                    return 0
+                return min(shape)
+
+            old_c = _channel_count(model.observation_space.shape)
+            new_c = _channel_count(env.observation_space.shape)
+
+            if old_c != new_c:
+                import torch
+                import torch.nn as nn
+
+                def _adjust_conv(net) -> None:
+                    fe = getattr(net, "features_extractor", None)
+                    cnn = getattr(fe, "cnn", None)
+                    if cnn is None or not isinstance(cnn[0], nn.Conv2d):
+                        return
+                    old_conv: nn.Conv2d = cnn[0]
+                    new_conv = nn.Conv2d(
+                        new_c,
+                        old_conv.out_channels,
+                        old_conv.kernel_size,
+                        old_conv.stride,
+                        old_conv.padding,
+                    )
+                    with torch.no_grad():
+                        # Copy existing channels
+                        num_copy = min(old_c, new_c)
+                        new_conv.weight[:, :num_copy] = old_conv.weight[:, :num_copy]
+                        if new_c > old_c:
+                            # Repeat the last channel for any additional ones
+                            for i in range(old_c, new_c):
+                                new_conv.weight[:, i] = old_conv.weight[:, old_c - 1]
+                        new_conv.bias[:] = old_conv.bias
+                    cnn[0] = new_conv
+
+                # Adjust both the online and target networks (handle attribute
+                # naming differences across SB3 versions).
+                for net_attr in ["q_net", "q_net_target", "target_q_net"]:
+                    net = getattr(model, net_attr, None)
+                    if net is not None:
+                        _adjust_conv(net)
+                if hasattr(model, "policy"):
+                    for net_attr in ["q_net", "q_net_target", "target_q_net"]:
+                        net = getattr(model.policy, net_attr, None)
+                        if net is not None:
+                            _adjust_conv(net)
+
+            # Update spaces and attach environment
+            model.observation_space = env.observation_space
+            if hasattr(model, "policy"):
+                model.policy.observation_space = env.observation_space
+            model.set_env(env)
+
         agent = cls.__new__(cls)
         agent.env = env
         agent.model = model
