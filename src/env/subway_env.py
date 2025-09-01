@@ -42,7 +42,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     swipes: left, right, jump, roll. If ``templates/menu_full.png`` and
     ``templates/crash_full.png`` exist, they are used for template matching to
     detect the menu and crash screens. The environment logs the detected game
-    state every ``state_log_interval`` seconds.
+    state every ``state_log_interval`` seconds. Rewards accrue with time spent
+    playing and a small negative penalty is applied when a crash occurs.
     """
 
     controller: Optional[ADBController] = None
@@ -54,6 +55,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     menu_template_path: Optional[Path] = Path("templates/menu_full.png")
     crash_template_path: Optional[Path] = Path("templates/crash_full.png")
     frame_stack: int = 1
+    crash_penalty: float = 5.0
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
@@ -216,7 +218,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
             self._menu_since = None
-            return self._get_observation(), 0.0, True, False, info
+            return self._get_observation(), -self.crash_penalty, True, False, info
 
         # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
@@ -235,6 +237,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         terminated = False
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
+            reward -= self.crash_penalty
             terminated = True
         if state == "menu":
             self._menu_since = now2

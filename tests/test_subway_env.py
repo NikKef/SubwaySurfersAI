@@ -73,6 +73,7 @@ def test_step_detects_crash_and_skips(monkeypatch):
     env.reset()
     obs, reward, terminated, truncated, info = env.step(0)
     controller.tap.assert_called_with(520, 1700)
+    assert reward == -env.crash_penalty
     assert terminated is True
 
 
