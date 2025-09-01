@@ -141,33 +141,74 @@ class DQNAgent:
                 import numpy as np
                 import gymnasium as gym
                 from gymnasium import spaces
+                from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvWrapper
 
-                old_c = _channel_count(old_shape)
-                new_c = _channel_count(new_shape)
-                old_index = old_shape.index(old_c)
-                new_index = new_shape.index(new_c)
+                def _find_perm(src: tuple[int, ...], dst: tuple[int, ...]) -> list[int]:
+                    """Return axes permutation to transform ``dst`` into ``src``."""
+                    perm: list[int] = []
+                    used = [False] * len(dst)
+                    for dim in src:
+                        for i, d in enumerate(dst):
+                            if not used[i] and d == dim:
+                                perm.append(i)
+                                used[i] = True
+                                break
+                    return perm
 
-                axes = list(range(len(new_shape)))
-                axes.pop(new_index)
-                axes.insert(old_index, new_index)
+                axes = _find_perm(old_shape, new_shape)
+                if axes and len(axes) == len(old_shape):
+                    if isinstance(env, VecEnv):
+                        from stable_baselines3.common.vec_env import VecTransposeImage
 
-                class _TransposeObs(gym.ObservationWrapper):
-                    def __init__(self, env: gym.Env):
-                        super().__init__(env)
-                        self.axes = tuple(axes)
-                        obs_space = env.observation_space
-                        if isinstance(obs_space, spaces.Box):
-                            self.observation_space = spaces.Box(
-                                low=np.transpose(obs_space.low, self.axes),
-                                high=np.transpose(obs_space.high, self.axes),
-                                dtype=obs_space.dtype,
-                            )
+                        if axes == [2, 0, 1]:
+                            env = VecTransposeImage(env)
+                        else:
+                            class _VecTransposeObs(VecEnvWrapper):
+                                def __init__(self, venv: VecEnv):
+                                    obs_space = venv.observation_space
+                                    assert isinstance(obs_space, spaces.Box)
+                                    transposed = spaces.Box(
+                                        low=np.transpose(obs_space.low, axes),
+                                        high=np.transpose(obs_space.high, axes),
+                                        dtype=obs_space.dtype,
+                                    )
+                                    super().__init__(venv, observation_space=transposed)
+                                    self.axes = tuple(axes)
 
-                    def observation(self, observation: np.ndarray) -> np.ndarray:
-                        return np.transpose(observation, self.axes)
+                                def reset(self):
+                                    obs = self.venv.reset()
+                                    return np.transpose(obs, (0, *self.axes))
 
-                env = _TransposeObs(env)
-                new_shape = getattr(env.observation_space, "shape", ())
+                                def step_wait(self):
+                                    obs, rewards, dones, infos = self.venv.step_wait()
+                                    obs = np.transpose(obs, (0, *self.axes))
+                                    for idx, done in enumerate(dones):
+                                        if done and "terminal_observation" in infos[idx]:
+                                            infos[idx]["terminal_observation"] = np.transpose(
+                                                infos[idx]["terminal_observation"], self.axes
+                                            )
+                                    return obs, rewards, dones, infos
+
+                            env = _VecTransposeObs(env)
+                    else:
+                        class _TransposeObs(gym.ObservationWrapper):
+                            def __init__(self, env: gym.Env):
+                                super().__init__(env)
+                                self.axes = tuple(axes)
+                                obs_space = env.observation_space
+                                if isinstance(obs_space, spaces.Box):
+                                    self.observation_space = spaces.Box(
+                                        low=np.transpose(obs_space.low, self.axes),
+                                        high=np.transpose(obs_space.high, self.axes),
+                                        dtype=obs_space.dtype,
+                                    )
+
+                            def observation(self, observation: np.ndarray) -> np.ndarray:
+                                return np.transpose(observation, self.axes)
+
+                        env = _TransposeObs(env)
+
+                    new_shape = getattr(env.observation_space, "shape", ())
 
             old_c = _channel_count(old_shape)
             new_c = _channel_count(new_shape)

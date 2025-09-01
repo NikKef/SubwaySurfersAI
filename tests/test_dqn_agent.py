@@ -79,6 +79,26 @@ class DummyEnv3(gym.Env):
         return obs, 0.0, False, False, {}
 
 
+class DummyEnvHCW(gym.Env):
+    """Environment with channel dimension in the middle."""
+
+    metadata = {"render_modes": []}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=(84, 3, 84), dtype=np.uint8
+        )
+        self.action_space = spaces.Discrete(4)
+
+    def reset(self, *, seed: int | None = None, options: dict | None = None):
+        return np.zeros(self.observation_space.shape, dtype=np.uint8), {}
+
+    def step(self, action: int):
+        obs = np.zeros(self.observation_space.shape, dtype=np.uint8)
+        return obs, 0.0, False, False, {}
+
+
 def test_dqn_agent_act() -> None:
     env = DummyEnv()
     agent = DQNAgent(
