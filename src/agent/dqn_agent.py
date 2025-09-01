@@ -129,8 +129,48 @@ class DQNAgent:
                     return 0
                 return min(shape)
 
-            old_c = _channel_count(model.observation_space.shape)
-            new_c = _channel_count(env.observation_space.shape)
+            old_shape = getattr(model.observation_space, "shape", ())
+            new_shape = getattr(env.observation_space, "shape", ())
+
+            if (
+                old_shape
+                and new_shape
+                and sorted(old_shape) == sorted(new_shape)
+                and old_shape != new_shape
+            ):
+                import numpy as np
+                import gymnasium as gym
+                from gymnasium import spaces
+
+                old_c = _channel_count(old_shape)
+                new_c = _channel_count(new_shape)
+                old_index = old_shape.index(old_c)
+                new_index = new_shape.index(new_c)
+
+                axes = list(range(len(new_shape)))
+                axes.pop(new_index)
+                axes.insert(old_index, new_index)
+
+                class _TransposeObs(gym.ObservationWrapper):
+                    def __init__(self, env: gym.Env):
+                        super().__init__(env)
+                        self.axes = tuple(axes)
+                        obs_space = env.observation_space
+                        if isinstance(obs_space, spaces.Box):
+                            self.observation_space = spaces.Box(
+                                low=np.transpose(obs_space.low, self.axes),
+                                high=np.transpose(obs_space.high, self.axes),
+                                dtype=obs_space.dtype,
+                            )
+
+                    def observation(self, observation: np.ndarray) -> np.ndarray:
+                        return np.transpose(observation, self.axes)
+
+                env = _TransposeObs(env)
+                new_shape = getattr(env.observation_space, "shape", ())
+
+            old_c = _channel_count(old_shape)
+            new_c = _channel_count(new_shape)
 
             if old_c != new_c:
                 import torch
