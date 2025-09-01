@@ -147,3 +147,24 @@ def test_load_expands_channels(tmp_path) -> None:
     loaded = DQNAgent.load(str(model_path), env4)
     conv = loaded.model.q_net.features_extractor.cnn[0]
     assert conv.weight.shape[1] == 4
+
+
+def test_load_transposed_observations(tmp_path) -> None:
+    """Models trained on channel-last inputs reload on channel-first envs."""
+    env_hwc = DummyEnv()
+    agent = DQNAgent(
+        env_hwc,
+        policy="CnnPolicy",
+        buffer_size=1,
+        learning_starts=0,
+        train_freq=1,
+        gradient_steps=1,
+    )
+    model_path = tmp_path / "agent.zip"
+    agent.save(str(model_path))
+
+    env_chw = DummyEnv3()
+    loaded = DQNAgent.load(str(model_path), env_chw)
+    obs, _ = env_chw.reset()
+    action = loaded.act(obs)
+    assert env_chw.action_space.contains(action)
