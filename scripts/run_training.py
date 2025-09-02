@@ -10,7 +10,6 @@ import logging
 import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 # Allow running as a script without installing the package
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.agent import DQNAgent  # noqa: E402
-from src.env import ADBController, SubwaySurfersEnv  # noqa: E402
+from src.env import SubwaySurfersEnv  # noqa: E402
 
 
 def find_latest_checkpoint(model_file: Path) -> Path | None:
@@ -44,12 +43,6 @@ def parse_args() -> argparse.Namespace:
         default=Path("models/dqn_subway_agent"),
         help="Where to store the trained model",
     )
-    parser.add_argument(
-        "--device-ids",
-        nargs="+",
-        default=None,
-        help="List of emulator device IDs. One environment is created per ID.",
-    )
     return parser.parse_args()
 
 
@@ -68,66 +61,40 @@ def main() -> None:
     gamma = float(cfg["gamma"])
     batch_size = int(cfg["batch_size"])
     train_steps = int(cfg["train_steps"])
-    frame_stack = int(cfg.get("frame_stack", 1))
-    hidden_sizes = cfg.get("hidden_sizes", [256, 256])
-    dueling = bool(cfg.get("dueling", True))
-    double_q = bool(cfg.get("double_q", True))
 
     # Resolve model file (Stable-Baselines appends ``.zip`` if missing).
     model_file = args.model_path
     if not model_file.suffix:
         model_file = model_file.with_suffix(".zip")
 
-    device_ids = args.device_ids or [None]
-
-    def make_env(device_id: str | None):
-        def _init() -> SubwaySurfersEnv:
-            controller = ADBController(device_id=device_id)
-            return SubwaySurfersEnv(controller=controller, frame_stack=frame_stack)
-
-        return _init
-
-    env_fns = [make_env(did) for did in device_ids]
-    env = SubprocVecEnv(env_fns) if len(env_fns) > 1 else DummyVecEnv(env_fns)
+    env = SubwaySurfersEnv()
 
     log_dir = model_file.parent / "tb"
     log_dir.mkdir(parents=True, exist_ok=True)
     logger = configure(str(log_dir), ["tensorboard", "stdout"])
 
-    # Load existing model or checkpoint if available.  If the observation space
-    # has changed (e.g. due to different frame stacking), loading will raise a
-    # ``ValueError``.  In that case start from scratch but keep the new
-    # environment settings.
-    agent = None
+    # Load existing model or checkpoint if available.
     if model_file.exists():
-        try:
-            agent = DQNAgent.load(str(model_file), env)
-            agent.model.set_logger(logger)
-            print(f"Loaded existing model from {model_file}")
-        except ValueError as err:
-            print(f"Could not load {model_file}: {err}\nStarting fresh model")
-
-    if agent is None:
+        agent = DQNAgent.load(str(model_file), env)
+        agent.model.set_logger(logger)
+        print(f"Loaded existing model from {model_file}")
+    else:
         latest = find_latest_checkpoint(model_file)
         if latest is not None:
-            try:
-                agent = DQNAgent.load(str(latest), env)
-                agent.model.set_logger(logger)
-                print(f"Loaded checkpoint {latest}")
-            except ValueError as err:
-                print(f"Could not load {latest}: {err}\nStarting fresh model")
-
-    if agent is None:
-        agent = DQNAgent(
-            env,
-            learning_rate=learning_rate,
-            buffer_size=buffer_size,
-            gamma=gamma,
-            batch_size=batch_size,
-            verbose=1,
-            tensorboard_log=str(log_dir),
-        )
-        print("Initialized new agent")
+            agent = DQNAgent.load(str(latest), env)
+            agent.model.set_logger(logger)
+            print(f"Loaded checkpoint {latest}")
+        else:
+            agent = DQNAgent(
+                env,
+                learning_rate=learning_rate,
+                buffer_size=buffer_size,
+                gamma=gamma,
+                batch_size=batch_size,
+                verbose=1,
+                tensorboard_log=str(log_dir),
+            )
+            print("Initialized new agent")
 
     # Setup checkpointing
     checkpoint_dir = model_file.parent / "checkpoints"
@@ -136,7 +103,6 @@ def main() -> None:
         save_freq=int(cfg.get("checkpoint_freq", 10000)),
         save_path=str(checkpoint_dir),
         name_prefix=model_file.stem,
-        save_replay_buffer=True,
     )
 
     steps_done = agent.model.num_timesteps
@@ -150,10 +116,7 @@ def main() -> None:
         agent.train(steps_remaining, callback=checkpoint_callback)
         model_file.parent.mkdir(parents=True, exist_ok=True)
         agent.save(str(model_file))
-        replay_path = model_file.with_name(f"{model_file.stem}_replay_buffer.pkl")
-        agent.model.save_replay_buffer(str(replay_path))
         print(f"Saved model to {model_file}")
-        print(f"Saved replay buffer to {replay_path}")
     else:
         print("Target timesteps already reached; skipping training")
 

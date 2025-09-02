@@ -5,7 +5,3 @@ gamma: 0.99
 buffer_size: 100000
 train_steps: 1000000
 checkpoint_freq: 10000
-frame_stack: 4
-hidden_sizes: [256, 256]
-dueling: true
-double_q: true
