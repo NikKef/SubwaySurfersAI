@@ -27,7 +27,7 @@ def test_reset_returns_observation():
     controller.screencap.return_value = _fake_png(0)
     env = SubwaySurfersEnv(controller=controller, frame_size=(50, 50))
     obs, info = env.reset()
-    assert obs.shape == (50, 50, env.frame_stack)
+    assert obs.shape == (50, 50, 3)
     assert info == {}
 
 
@@ -73,7 +73,6 @@ def test_step_detects_crash_and_skips(monkeypatch):
     env.reset()
     obs, reward, terminated, truncated, info = env.step(0)
     controller.tap.assert_called_with(520, 1700)
-    assert reward == -env.crash_penalty
     assert terminated is True
 
 

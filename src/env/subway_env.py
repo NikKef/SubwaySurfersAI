@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Tuple, Optional
 import logging
-from collections import deque
 
 import cv2
 import gymnasium as gym
@@ -41,19 +40,16 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     swipes: left, right, jump, roll. If ``templates/menu_full.png`` and
     ``templates/crash_full.png`` exist, they are used for template matching to
     detect the menu and crash screens. The environment logs the detected game
-    state every ``state_log_interval`` seconds. Rewards accrue with time spent
-    playing and a small negative penalty is applied when a crash occurs.
+    state every ``state_log_interval`` seconds.
     """
 
     controller: Optional[ADBController] = None
     frame_size: Tuple[int, int] = (160, 90)  # (width, height)
-    frame_stack: int = 4
     action_coords: Dict[int, Tuple[int, int, int, int]] = field(
         default_factory=lambda: DEFAULT_ACTION_COORDS.copy()
     )
     menu_template_path: Optional[Path] = Path("templates/menu_full.png")
     crash_template_path: Optional[Path] = Path("templates/crash_full.png")
-    crash_penalty: float = 5.0
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
@@ -61,18 +57,16 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     _last_frame_time: float = field(init=False, default_factory=lambda: 0.0)
     _elapsed_play_time: float = field(init=False, default_factory=lambda: 0.0)
     _menu_since: Optional[float] = field(init=False, default=None)
-    _frames: deque[np.ndarray] = field(init=False, repr=False)
 
     metadata = {"render_modes": ["rgb_array"]}
 
     def __post_init__(self) -> None:
         self.controller = self.controller or ADBController()
         width, height = self.frame_size
-        self._frames = deque(maxlen=self.frame_stack)
         self.observation_space = spaces.Box(
             low=0,
             high=255,
-            shape=(height, width, self.frame_stack),
+            shape=(height, width, 3),
             dtype=np.uint8,
         )
         self.action_space = spaces.Discrete(len(self.action_coords))
@@ -94,7 +88,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         return Image.open(io.BytesIO(png_bytes)).convert("RGB")
 
     def _preprocess(self, image: Image.Image) -> np.ndarray:
-        image = image.convert("L").resize(self.frame_size, Image.BILINEAR)
+        image = image.resize(self.frame_size, Image.BILINEAR)
         return np.asarray(image, dtype=np.uint8)
 
     def _match_template(
@@ -165,28 +159,17 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         image = self._capture_raw()
         return self._preprocess(image)
 
-    def _get_observation(self) -> np.ndarray:
-        """Return the stacked grayscale frames as an observation tensor."""
-        return np.stack(list(self._frames), axis=-1)
-
     # Gymnasium API ----------------------------------------------------
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
         self._ensure_playing()
         image = self._capture_raw()
-        frame = self._preprocess(image)
-        self._frames.clear()
-        for _ in range(self.frame_stack):
-            self._frames.append(frame)
         self._last_frame_time = time.time()
         self._elapsed_play_time = 0.0
         self._menu_since = None
         self._log_state(image)
-        frame = self._preprocess(image)
-        self._frames.clear()
-        for _ in range(self.frame_stack):
-            self._frames.append(frame)
-        return self._get_observation(), {}
+        observation = self._preprocess(image)
+        return observation, {}
 
     def step(self, action: int):
         image = self._capture_raw()
@@ -194,28 +177,25 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         now = time.time()
         self._log_state(image)
 
+        # Handle non-playing states before executing the action.
         if state == "menu":
             if self._menu_since is None:
                 self._menu_since = now
             elif now - self._menu_since > 5.0:
                 self.controller.tap(*PLAY_BUTTON_COORD)
                 self._menu_since = now
-            frame = self._preprocess(image)
-            self._frames.append(frame)
-            observation = np.stack(list(self._frames), axis=-1)
+            observation = self._preprocess(image)
             self._last_frame_time = now
             return observation, 0.0, False, False, {}
 
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
-            frame = self._preprocess(image)
-            self._frames.append(frame)
-            observation = np.stack(list(self._frames), axis=-1)
+            observation = self._preprocess(image)
             self._last_frame_time = now
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
             self._menu_since = None
-            return self._get_observation(), -self.crash_penalty, True, False, info
+            return observation, 0.0, True, False, info
 
         # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
@@ -234,21 +214,18 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         terminated = False
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
-            reward -= self.crash_penalty
             terminated = True
         if state == "menu":
             self._menu_since = now2
         else:
             self._menu_since = None
 
-        frame = self._preprocess(image)
-        self._frames.append(frame)
-        observation = np.stack(list(self._frames), axis=-1)
+        observation = self._preprocess(image)
         info: Dict[str, float] = {"time_survived": self._elapsed_play_time}
         if terminated:
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
-        return self._get_observation(), reward, terminated, False, info
+        return observation, reward, terminated, False, info
 
     def render(self) -> np.ndarray:
         return self._get_frame()

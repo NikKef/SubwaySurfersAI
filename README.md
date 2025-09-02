@@ -45,9 +45,7 @@ pre-commit run --files $(git ls-files '*.py')
 
 ### 6. Train the baseline agent
 
-With the emulator running and *Subway Surfers* open, launch training. The
-default configuration stacks four consecutive **grayscale** frames to provide
-temporal context for the agent:
+With the emulator running and *Subway Surfers* open, launch training:
 
 ```bash
 python scripts/run_training.py --config configs/default.yaml --model-path models/dqn_subway_agent
@@ -56,12 +54,9 @@ python scripts/run_training.py --config configs/default.yaml --model-path models
 The script prints training progress and automatically saves checkpoints under
 `models/checkpoints/`. If a model or checkpoint already exists, training
 resumes from the latest state and continues with the correct learning rate
-schedules. If the observation shape has changed (e.g. after enabling frame
-stacking), the existing checkpoint will be ignored and training starts with a
-fresh model. Rewards reflect **time survived while the game is actually
-playing**, with a small negative penalty applied when a crash occurs. Time spent
-in menus or on crash screens does not contribute to the reward or episode
-length.
+schedules. Rewards reflect **time survived while the game is actually playing**;
+time spent in menus or on crash screens does not contribute to the reward or
+episode length.
 
 To visualize learning curves, launch TensorBoard in another terminal:
 
@@ -75,20 +70,6 @@ After training, watch the agent play:
 
 ```bash
 python scripts/play_agent.py --model-path models/dqn_subway_agent
-```
-
-### 8. Evaluate a trained model
-
-Run a fixed number of episodes and log reward and survival time:
-
-```bash
-python scripts/evaluate_agent.py --model-path models/dqn_subway_agent --episodes 10
-```
-
-Evaluation metrics are written to `models/tb_eval` and can be viewed with:
-
-```bash
-tensorboard --logdir models/tb_eval
 ```
 
 ## Project Structure
