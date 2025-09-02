@@ -195,7 +195,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
             self._menu_since = None
-            return observation, 0.0, True, False, info
+            # Penalize crashes with a negative reward.
+            return observation, -1.0, True, False, info
 
         # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
@@ -207,14 +208,16 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         state = self._detect_state(image)
         now2 = time.time()
         self._log_state(image)
-        reward = max(now2 - self._last_frame_time, 0.0)
-        self._elapsed_play_time += reward
+        time_reward = max(now2 - self._last_frame_time, 0.0)
+        self._elapsed_play_time += time_reward
         self._last_frame_time = now2
 
         terminated = False
+        reward = time_reward
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
             terminated = True
+            reward = -1.0
         if state == "menu":
             self._menu_since = now2
         else:
