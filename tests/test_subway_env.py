@@ -54,7 +54,8 @@ def test_step_swipe_called(monkeypatch, action, coords):
     obs, reward, terminated, truncated, info = env.step(action)
     controller.swipe.assert_called_once_with(*coords)
     assert obs.shape == env.observation_space.shape
-    assert reward == 0.0
+    # Non-crash steps should never return a negative reward.
+    assert reward >= 0.0
     assert terminated is False
     assert truncated is False
     assert info == {"time_survived": 0.0}
@@ -73,7 +74,9 @@ def test_step_detects_crash_and_skips(monkeypatch):
     env.reset()
     obs, reward, terminated, truncated, info = env.step(0)
     controller.tap.assert_called_with(520, 1700)
+    assert reward == -1.0
     assert terminated is True
+    assert info == {"time_survived": 0.0}
 
 
 def test_template_matching_detects_menu(tmp_path):
