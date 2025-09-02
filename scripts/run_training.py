@@ -10,6 +10,7 @@ import logging
 import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 # Allow running as a script without installing the package
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.agent import DQNAgent  # noqa: E402
-from src.env import SubwaySurfersEnv  # noqa: E402
+from src.env import ADBController, SubwaySurfersEnv  # noqa: E402
 
 
 def find_latest_checkpoint(model_file: Path) -> Path | None:
@@ -42,6 +43,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("models/dqn_subway_agent"),
         help="Where to store the trained model",
+    )
+    parser.add_argument(
+        "--device-ids",
+        nargs="+",
+        default=None,
+        help="List of emulator device IDs. One environment is created per ID.",
     )
     return parser.parse_args()
 
@@ -71,7 +78,17 @@ def main() -> None:
     if not model_file.suffix:
         model_file = model_file.with_suffix(".zip")
 
-    env = SubwaySurfersEnv(frame_stack=frame_stack)
+    device_ids = args.device_ids or [None]
+
+    def make_env(device_id: str | None):
+        def _init() -> SubwaySurfersEnv:
+            controller = ADBController(device_id=device_id)
+            return SubwaySurfersEnv(controller=controller, frame_stack=frame_stack)
+
+        return _init
+
+    env_fns = [make_env(did) for did in device_ids]
+    env = SubprocVecEnv(env_fns) if len(env_fns) > 1 else DummyVecEnv(env_fns)
 
     log_dir = model_file.parent / "tb"
     log_dir.mkdir(parents=True, exist_ok=True)
