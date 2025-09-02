@@ -4,7 +4,7 @@ import io
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Deque, Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional
 import logging
 from collections import deque
 
@@ -13,7 +13,6 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from PIL import Image
-from collections import deque
 
 from .adb_controller import ADBController
 
@@ -54,7 +53,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     )
     menu_template_path: Optional[Path] = Path("templates/menu_full.png")
     crash_template_path: Optional[Path] = Path("templates/crash_full.png")
-    frame_stack: int = 1
     crash_penalty: float = 5.0
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
@@ -78,7 +76,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             dtype=np.uint8,
         )
         self.action_space = spaces.Discrete(len(self.action_coords))
-        self._frames = deque(maxlen=self.frame_stack)
 
         if self.menu_template_path and Path(self.menu_template_path).exists():
             self.menu_template = cv2.imread(
