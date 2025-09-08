@@ -61,6 +61,8 @@ def main() -> None:
     gamma = float(cfg["gamma"])
     batch_size = int(cfg["batch_size"])
     train_steps = int(cfg["train_steps"])
+    exploration_fraction = float(cfg.get("exploration_fraction", 0.1))
+    exploration_final_eps = float(cfg.get("exploration_final_eps", 0.05))
 
     # Resolve model file (Stable-Baselines appends ``.zip`` if missing).
     model_file = args.model_path
@@ -91,6 +93,8 @@ def main() -> None:
                 buffer_size=buffer_size,
                 gamma=gamma,
                 batch_size=batch_size,
+                exploration_fraction=exploration_fraction,
+                exploration_final_eps=exploration_final_eps,
                 verbose=1,
                 tensorboard_log=str(log_dir),
             )
