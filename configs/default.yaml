@@ -1,5 +1,5 @@
 # Default hyper-parameters for training
-batch_size: 32
+batch_size: 64
 learning_rate: 1e-4
 gamma: 0.99
 buffer_size: 100000
