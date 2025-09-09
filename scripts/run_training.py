@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 from src.agent import DQNAgent  # noqa: E402
 from src.env import SubwaySurfersEnv  # noqa: E402
+from src.training.utils import update_dqn_hyperparameters  # noqa: E402
 
 
 def find_latest_checkpoint(model_file: Path) -> Path | None:
@@ -99,6 +100,14 @@ def main() -> None:
                 tensorboard_log=str(log_dir),
             )
             print("Initialized new agent")
+
+    # Apply potentially updated hyper-parameters when resuming training
+    update_dqn_hyperparameters(
+        agent.model,
+        learning_rate=learning_rate,
+        exploration_fraction=exploration_fraction,
+        exploration_final_eps=exploration_final_eps,
+    )
 
     # Setup checkpointing
     checkpoint_dir = model_file.parent / "checkpoints"
