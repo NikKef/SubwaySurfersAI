@@ -53,8 +53,8 @@ python scripts/run_training.py --config configs/default.yaml --model-path models
 
 The script prints training progress and automatically saves checkpoints under
 `models/checkpoints/`. If a model or checkpoint already exists, training
-resumes from the latest state and continues with the correct learning rate
-schedules. Rewards reflect **time survived while the game is actually playing**;
+resumes from the latest state and continues with the specified learning rate
+and exploration schedule. Rewards reflect **time survived while the game is actually playing**;
 time spent in menus or on crash screens does not contribute to the reward or
 episode length.
 
