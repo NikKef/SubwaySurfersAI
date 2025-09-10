@@ -72,6 +72,18 @@ After training, watch the agent play:
 python scripts/play_agent.py --model-path models/dqn_subway_agent
 ```
 
+## Evaluation
+
+Measure how well a trained model performs:
+
+```bash
+python scripts/evaluate_agent.py --episodes 5
+```
+
+By default the script evaluates the latest checkpoint found under
+`models/checkpoints/`. Use `--model-path` to test a specific checkpoint file.
+
+
 ## Project Structure
 
 ```
