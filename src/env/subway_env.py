@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,7 +12,6 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from PIL import Image
-import pytesseract
 
 from .adb_controller import ADBController
 
@@ -56,12 +54,9 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
     _last_state_log: float = field(init=False, default_factory=lambda: 0.0)
+    _last_frame_time: float = field(init=False, default_factory=lambda: 0.0)
+    _elapsed_play_time: float = field(init=False, default_factory=lambda: 0.0)
     _menu_since: Optional[float] = field(init=False, default=None)
-    _last_run_score: int = field(init=False, default=0)
-    _last_run_coins: int = field(init=False, default=0)
-    _pending_reward: float = field(init=False, default=0.0)
-    score_weight: float = 1.0
-    coin_weight: float = 1.0
 
     metadata = {"render_modes": ["rgb_array"]}
 
@@ -106,47 +101,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             return float(res.min()) <= (1 - threshold)
         res = cv2.matchTemplate(img_gray, template, method)
         return float(res.max()) >= threshold
-
-    def _extract_score_from_menu(self, image: Image.Image) -> Optional[int]:
-        """Extract the score shown on the menu screen."""
-        w, h = image.size
-        # Crop the area containing the "Score" widget (upper-middle right).
-        region = image.crop(
-            (
-                int(w * 0.55),
-                int(h * 0.15),
-                int(w * 0.95),
-                int(h * 0.35),
-            )
-        )
-        gray = cv2.cvtColor(np.array(region), cv2.COLOR_RGB2GRAY)
-        text = pytesseract.image_to_string(
-            gray, config="--psm 7 -c tessedit_char_whitelist=0123456789"
-        )
-        match = re.search(r"\d+", text)
-        if match:
-            return int(match.group())
-        return None
-
-    def _extract_coin_count(self, image: Image.Image) -> Optional[int]:
-        """Extract the coin total shown on the menu screen."""
-        w, h = image.size
-        region = image.crop(
-            (
-                int(w * 0.55),
-                int(h * 0.35),
-                int(w * 0.95),
-                int(h * 0.55),
-            )
-        )
-        gray = cv2.cvtColor(np.array(region), cv2.COLOR_RGB2GRAY)
-        text = pytesseract.image_to_string(
-            gray, config="--psm 7 -c tessedit_char_whitelist=0123456789"
-        )
-        match = re.search(r"\d+", text)
-        if match:
-            return int(match.group())
-        return None
 
     def _is_menu(self, image: Image.Image) -> bool:
         if self.menu_template is not None and self._match_template(
@@ -194,16 +148,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             if state == "crashed":
                 self.controller.tap(*CRASH_DISMISS_COORD)
                 time.sleep(1)
-                try:
-                    menu_img = self._capture_raw()
-                    score = self._extract_score_from_menu(menu_img)
-                    coins = self._extract_coin_count(menu_img)
-                    if score is not None:
-                        self._last_run_score = score
-                    if coins is not None:
-                        self._last_run_coins = coins
-                except Exception:
-                    pass
                 continue
             if state == "menu":
                 self.controller.tap(*PLAY_BUTTON_COORD)
@@ -220,6 +164,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         super().reset(seed=seed)
         self._ensure_playing()
         image = self._capture_raw()
+        self._last_frame_time = time.time()
+        self._elapsed_play_time = 0.0
         self._menu_since = None
         self._log_state(image)
         observation = self._preprocess(image)
@@ -231,11 +177,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         now = time.time()
         self._log_state(image)
 
-        reward = 0.0
-        if state == "playing" and self._pending_reward:
-            reward = self._pending_reward
-            self._pending_reward = 0.0
-
         # Handle non-playing states before executing the action.
         if state == "menu":
             if self._menu_since is None:
@@ -244,34 +185,20 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self.controller.tap(*PLAY_BUTTON_COORD)
                 self._menu_since = now
             observation = self._preprocess(image)
-            return observation, 0.0, False, False, {"time_survived": 0.0}
+            self._last_frame_time = now
+            return observation, 0.0, False, False, {}
 
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
-            time.sleep(1)
-            try:
-                menu_img = self._capture_raw()
-            except Exception:
-                menu_img = image
-            score = self._extract_score_from_menu(menu_img)
-            coins = self._extract_coin_count(menu_img)
-            score_delta = 0
-            coin_delta = 0
-            if score is not None:
-                score_delta = score - self._last_run_score
-                self._last_run_score = score
-            if coins is not None:
-                coin_delta = coins - self._last_run_coins
-                self._last_run_coins = coins
-            self._pending_reward = (
-                self.score_weight * score_delta + self.coin_weight * coin_delta
-            )
-            LOGGER.info("Run finished: score=%s, coins=%s", score, coins)
-            observation = self._preprocess(menu_img)
-            self._menu_since = now
-            return observation, -1.0, True, False, {"time_survived": 0.0}
+            observation = self._preprocess(image)
+            self._last_frame_time = now
+            info = {"time_survived": self._elapsed_play_time}
+            self._elapsed_play_time = 0.0
+            self._menu_since = None
+            # Penalize crashes with a negative reward.
+            return observation, -1.0, True, False, info
 
-        # Playing: execute action with no intermediate reward.
+        # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
             raise gym.error.InvalidAction(f"Invalid action: {action}")
         x1, y1, x2, y2 = self.action_coords[action]
@@ -281,38 +208,27 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         state = self._detect_state(image)
         now2 = time.time()
         self._log_state(image)
+        time_reward = max(now2 - self._last_frame_time, 0.0)
+        self._elapsed_play_time += time_reward
+        self._last_frame_time = now2
 
+        terminated = False
+        reward = time_reward
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
-            time.sleep(1)
-            try:
-                menu_img = self._capture_raw()
-            except Exception:
-                menu_img = image
-            score = self._extract_score_from_menu(menu_img)
-            coins = self._extract_coin_count(menu_img)
-            score_delta = 0
-            coin_delta = 0
-            if score is not None:
-                score_delta = score - self._last_run_score
-                self._last_run_score = score
-            if coins is not None:
-                coin_delta = coins - self._last_run_coins
-                self._last_run_coins = coins
-            self._pending_reward = (
-                self.score_weight * score_delta + self.coin_weight * coin_delta
-            )
-            LOGGER.info("Run finished: score=%s, coins=%s", score, coins)
-            observation = self._preprocess(menu_img)
-            self._menu_since = now2
-            return observation, -1.0, True, False, {"time_survived": 0.0}
+            terminated = True
+            reward = -1.0
         if state == "menu":
             self._menu_since = now2
         else:
             self._menu_since = None
 
         observation = self._preprocess(image)
-        return observation, reward, False, False, {"time_survived": 0.0}
+        info: Dict[str, float] = {"time_survived": self._elapsed_play_time}
+        if terminated:
+            info = {"time_survived": self._elapsed_play_time}
+            self._elapsed_play_time = 0.0
+        return observation, reward, terminated, False, info
 
     def render(self) -> np.ndarray:
         return self._get_frame()
