@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from src.agent import DQNAgent  # noqa: E402
 from src.env import SubwaySurfersEnv  # noqa: E402
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,15 +32,16 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     args = parse_args()
 
-    env = SubwaySurfersEnv()
+    base_env = DummyVecEnv([SubwaySurfersEnv])
+    env = VecFrameStack(base_env, n_stack=4)
     agent = DQNAgent.load(str(args.model_path), env)
 
-    obs, _ = env.reset()
-    terminated = False
-    while not terminated:
+    obs = env.reset()
+    done = False
+    while not done:
         action = agent.act(obs)
-        obs, _, terminated, truncated, _ = env.step(action)
-        terminated = terminated or truncated
+        obs, _, done, _ = env.step([action])
+        done = bool(done[0])
 
     env.close()
 

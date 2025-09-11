@@ -10,6 +10,7 @@ import logging
 import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 
 # Allow running as a script without installing the package
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,7 +71,9 @@ def main() -> None:
     if not model_file.suffix:
         model_file = model_file.with_suffix(".zip")
 
-    env = SubwaySurfersEnv()
+    # Stack consecutive frames to give the agent a sense of motion.
+    base_env = DummyVecEnv([SubwaySurfersEnv])
+    env = VecFrameStack(base_env, n_stack=4)
 
     log_dir = model_file.parent / "tb"
     log_dir.mkdir(parents=True, exist_ok=True)
