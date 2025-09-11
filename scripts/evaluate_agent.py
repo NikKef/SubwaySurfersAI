@@ -9,6 +9,7 @@ import logging
 
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 
 # Allow running as a script without installing the package
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +58,8 @@ def main() -> None:
     if not model_path.suffix:
         model_path = model_path.with_suffix(".zip")
 
-    env = SubwaySurfersEnv()
+    base_env = DummyVecEnv([SubwaySurfersEnv])
+    env = VecFrameStack(base_env, n_stack=4)
     agent = DQNAgent.load(str(model_path), env)
 
     mean_reward, std_reward = evaluate_policy(
