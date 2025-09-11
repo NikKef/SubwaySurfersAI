@@ -102,7 +102,7 @@ def test_log_state_reports_menu(caplog):
     controller = Mock(spec=ADBController)
     env = SubwaySurfersEnv(controller=controller)
     image = Image.new("RGB", (1080, 2400), (0, 255, 0))
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.DEBUG):
         env._log_state(image)
     assert "Game state: menu" in caplog.text
 
@@ -118,3 +118,21 @@ def test_menu_retry_after_timeout(monkeypatch):
     env.step(0)  # first menu detection, set _menu_since
     env.step(0)  # after 6s, should tap again
     controller.tap.assert_called_with(*PLAY_BUTTON_COORD)
+
+
+def test_episode_end_logs_length_and_reward(caplog, monkeypatch):
+    controller = Mock(spec=ADBController)
+    controller.screencap.side_effect = [
+        _fake_png(0),  # ensure_playing
+        _fake_png(0),  # reset frame
+        _fake_png(0),  # step start
+        _fake_png((255, 0, 0)),  # crash frame
+    ]
+    monkeypatch.setattr(time, "time", lambda: 0.0)
+    env = SubwaySurfersEnv(controller=controller)
+    env.reset()
+    with caplog.at_level(logging.INFO):
+        env.step(0)
+    assert "Game finished" in caplog.text
+    assert "length=1" in caplog.text
+    assert "reward=-1.00" in caplog.text
