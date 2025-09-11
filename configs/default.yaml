@@ -7,3 +7,5 @@ train_steps: 1000000
 checkpoint_freq: 10000
 exploration_fraction: 0.2
 exploration_final_eps: 0.02
+score_weight: 1.0
+coin_weight: 1.0
