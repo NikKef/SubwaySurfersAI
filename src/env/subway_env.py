@@ -56,6 +56,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     _last_state_log: float = field(init=False, default_factory=lambda: 0.0)
     _last_frame_time: float = field(init=False, default_factory=lambda: 0.0)
     _elapsed_play_time: float = field(init=False, default_factory=lambda: 0.0)
+    _episode_reward: float = field(init=False, default_factory=lambda: 0.0)
+    _episode_length: int = field(init=False, default_factory=lambda: 0)
     _menu_since: Optional[float] = field(init=False, default=None)
 
     metadata = {"render_modes": ["rgb_array"]}
@@ -129,7 +131,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         if now - self._last_state_log < self.state_log_interval:
             return
         state = self._detect_state(image)
-        LOGGER.info("Game state: %s", state)
+        LOGGER.debug("Game state: %s", state)
         self._last_state_log = now
 
     def _detect_state(self, image: Image.Image) -> str:
@@ -166,6 +168,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         image = self._capture_raw()
         self._last_frame_time = time.time()
         self._elapsed_play_time = 0.0
+        self._episode_reward = 0.0
+        self._episode_length = 0
         self._menu_since = None
         self._log_state(image)
         observation = self._preprocess(image)
@@ -192,8 +196,17 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             self.controller.tap(*CRASH_DISMISS_COORD)
             observation = self._preprocess(image)
             self._last_frame_time = now
+            self._episode_reward += -1.0
+            self._episode_length += 1
             info = {"time_survived": self._elapsed_play_time}
+            LOGGER.info(
+                "Game finished: length=%d, reward=%.2f",
+                self._episode_length,
+                self._episode_reward,
+            )
             self._elapsed_play_time = 0.0
+            self._episode_reward = 0.0
+            self._episode_length = 0
             self._menu_since = None
             # Penalize crashes with a negative reward.
             return observation, -1.0, True, False, info
@@ -223,11 +236,21 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         else:
             self._menu_since = None
 
+        self._episode_reward += reward
+        self._episode_length += 1
+
         observation = self._preprocess(image)
         info: Dict[str, float] = {"time_survived": self._elapsed_play_time}
         if terminated:
+            LOGGER.info(
+                "Game finished: length=%d, reward=%.2f",
+                self._episode_length,
+                self._episode_reward,
+            )
             info = {"time_survived": self._elapsed_play_time}
             self._elapsed_play_time = 0.0
+            self._episode_reward = 0.0
+            self._episode_length = 0
         return observation, reward, terminated, False, info
 
     def render(self) -> np.ndarray:
