@@ -198,7 +198,11 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             self._last_frame_time = now
             self._episode_reward += -1.0
             self._episode_length += 1
-            info = {"time_survived": self._elapsed_play_time}
+            info = {
+                "time_survived": self._elapsed_play_time,
+                "episode_reward": self._episode_reward,
+                "episode_length": self._episode_length,
+            }
             LOGGER.info(
                 "Game finished: length=%d, reward=%.2f",
                 self._episode_length,
@@ -247,7 +251,11 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self._episode_length,
                 self._episode_reward,
             )
-            info = {"time_survived": self._elapsed_play_time}
+            info = {
+                "time_survived": self._elapsed_play_time,
+                "episode_reward": self._episode_reward,
+                "episode_length": self._episode_length,
+            }
             self._elapsed_play_time = 0.0
             self._episode_reward = 0.0
             self._episode_length = 0
