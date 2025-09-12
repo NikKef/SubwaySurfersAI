@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Tuple
+
 from stable_baselines3.common.utils import LinearSchedule
+
+from src.agent import DQNAgent
 
 
 def update_dqn_hyperparameters(
@@ -34,3 +39,36 @@ def update_dqn_hyperparameters(
         model.exploration_fraction,
     )
     model.exploration_rate = model.exploration_initial_eps
+
+
+def load_or_create_dqn_agent(
+    model_path: str | Path,
+    env,
+    **agent_kwargs,
+) -> Tuple[DQNAgent, bool]:
+    """Return a loaded DQNAgent or create a new one on failure.
+
+    Parameters
+    ----------
+    model_path:
+        Path to the saved model. If loading fails (e.g. due to mismatched
+        observation spaces), a new agent is instantiated instead.
+    env:
+        Environment to attach to the agent.
+    **agent_kwargs:
+        Keyword arguments forwarded to :class:`~src.agent.DQNAgent` when a new
+        agent must be created.
+
+    Returns
+    -------
+    Tuple[DQNAgent, bool]
+        The agent and a flag indicating whether the model was successfully
+        loaded (``True``) or a new agent was created (``False``).
+    """
+
+    try:
+        agent = DQNAgent.load(str(model_path), env)
+        return agent, True
+    except Exception:
+        agent = DQNAgent(env, **agent_kwargs)
+        return agent, False
