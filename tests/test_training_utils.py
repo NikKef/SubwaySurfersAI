@@ -8,7 +8,10 @@ from gymnasium import spaces
 import pytest
 
 from src.agent import DQNAgent
-from src.training.utils import update_dqn_hyperparameters
+from src.training.utils import (
+    update_dqn_hyperparameters,
+    load_or_create_dqn_agent,
+)
 
 
 class DummyEnv(gym.Env):
@@ -33,6 +36,16 @@ class DummyEnv(gym.Env):
         truncated = False
         info: dict = {}
         return obs, reward, terminated, truncated, info
+
+
+class StackedDummyEnv(DummyEnv):
+    """Dummy environment with a different observation shape."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=(84, 84, 12), dtype=np.uint8
+        )
 
 
 def test_update_dqn_hyperparameters() -> None:
@@ -68,3 +81,30 @@ def test_update_dqn_hyperparameters() -> None:
     schedule = model.exploration_schedule
     assert schedule(1.0) == pytest.approx(1.0)
     assert schedule(0.0) == pytest.approx(0.1)
+
+
+def test_load_or_create_dqn_agent_handles_space_mismatch(tmp_path) -> None:
+    env = DummyEnv()
+    agent = DQNAgent(
+        env,
+        policy="CnnPolicy",
+        buffer_size=1,
+        learning_starts=0,
+        train_freq=1,
+        gradient_steps=1,
+    )
+    model_path = tmp_path / "model.zip"
+    agent.save(str(model_path))
+
+    stacked_env = StackedDummyEnv()
+    new_agent, loaded = load_or_create_dqn_agent(
+        model_path,
+        stacked_env,
+        policy="CnnPolicy",
+        buffer_size=1,
+        learning_starts=0,
+        train_freq=1,
+        gradient_steps=1,
+    )
+    assert isinstance(new_agent, DQNAgent)
+    assert loaded is False

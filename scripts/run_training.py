@@ -19,7 +19,10 @@ if str(ROOT) not in sys.path:
 
 from src.agent import DQNAgent  # noqa: E402
 from src.env import SubwaySurfersEnv  # noqa: E402
-from src.training.utils import update_dqn_hyperparameters  # noqa: E402
+from src.training.utils import (
+    update_dqn_hyperparameters,
+    load_or_create_dqn_agent,
+)  # noqa: E402
 
 
 def find_latest_checkpoint(model_file: Path) -> Path | None:
@@ -79,29 +82,43 @@ def main() -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     logger = configure(str(log_dir), ["tensorboard", "stdout"])
 
-    # Load existing model or checkpoint if available.
+    agent_kwargs = dict(
+        learning_rate=learning_rate,
+        buffer_size=buffer_size,
+        gamma=gamma,
+        batch_size=batch_size,
+        exploration_fraction=exploration_fraction,
+        exploration_final_eps=exploration_final_eps,
+        verbose=1,
+        tensorboard_log=str(log_dir),
+    )
+
+    # Load existing model or checkpoint if available, falling back to a new
+    # agent when loading fails (e.g. due to mismatched observation spaces).
     if model_file.exists():
-        agent = DQNAgent.load(str(model_file), env)
+        agent, loaded = load_or_create_dqn_agent(model_file, env, **agent_kwargs)
         agent.model.set_logger(logger)
-        print(f"Loaded existing model from {model_file}")
+        if loaded:
+            print(f"Loaded existing model from {model_file}")
+        else:
+            print(
+                f"Existing model at {model_file} could not be loaded; "
+                "initialized new agent"
+            )
     else:
         latest = find_latest_checkpoint(model_file)
         if latest is not None:
-            agent = DQNAgent.load(str(latest), env)
+            agent, loaded = load_or_create_dqn_agent(latest, env, **agent_kwargs)
             agent.model.set_logger(logger)
-            print(f"Loaded checkpoint {latest}")
+            if loaded:
+                print(f"Loaded checkpoint {latest}")
+            else:
+                print(
+                    f"Checkpoint {latest} could not be loaded; initialized new agent"
+                )
         else:
-            agent = DQNAgent(
-                env,
-                learning_rate=learning_rate,
-                buffer_size=buffer_size,
-                gamma=gamma,
-                batch_size=batch_size,
-                exploration_fraction=exploration_fraction,
-                exploration_final_eps=exploration_final_eps,
-                verbose=1,
-                tensorboard_log=str(log_dir),
-            )
+            agent = DQNAgent(env, **agent_kwargs)
+            agent.model.set_logger(logger)
             print("Initialized new agent")
 
     # Apply potentially updated hyper-parameters when resuming training
