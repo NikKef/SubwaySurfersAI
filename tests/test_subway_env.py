@@ -76,7 +76,11 @@ def test_step_detects_crash_and_skips(monkeypatch):
     controller.tap.assert_called_with(520, 1700)
     assert reward == -1.0
     assert terminated is True
-    assert info == {"time_survived": 0.0}
+    assert info == {
+        "time_survived": 0.0,
+        "episode_reward": -1.0,
+        "episode_length": 1,
+    }
 
 
 def test_template_matching_detects_menu(tmp_path):

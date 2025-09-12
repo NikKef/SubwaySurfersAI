@@ -8,7 +8,7 @@ from pathlib import Path
 import logging
 
 import yaml
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 
@@ -19,10 +19,11 @@ if str(ROOT) not in sys.path:
 
 from src.agent import DQNAgent  # noqa: E402
 from src.env import SubwaySurfersEnv  # noqa: E402
-from src.training.utils import (
+from src.training import EpisodeMetricsCallback  # noqa: E402
+from src.training.utils import (  # noqa: E402
     update_dqn_hyperparameters,
     load_or_create_dqn_agent,
-)  # noqa: E402
+)
 
 
 def find_latest_checkpoint(model_file: Path) -> Path | None:
@@ -113,9 +114,7 @@ def main() -> None:
             if loaded:
                 print(f"Loaded checkpoint {latest}")
             else:
-                print(
-                    f"Checkpoint {latest} could not be loaded; initialized new agent"
-                )
+                print(f"Checkpoint {latest} could not be loaded; initialized new agent")
         else:
             agent = DQNAgent(env, **agent_kwargs)
             agent.model.set_logger(logger)
@@ -137,6 +136,7 @@ def main() -> None:
         save_path=str(checkpoint_dir),
         name_prefix=model_file.stem,
     )
+    callbacks = CallbackList([checkpoint_callback, EpisodeMetricsCallback()])
 
     steps_done = agent.model.num_timesteps
     steps_remaining = max(train_steps - steps_done, 0)
@@ -146,7 +146,7 @@ def main() -> None:
     )
 
     if steps_remaining > 0:
-        agent.train(steps_remaining, callback=checkpoint_callback)
+        agent.train(steps_remaining, callback=callbacks)
         model_file.parent.mkdir(parents=True, exist_ok=True)
         agent.save(str(model_file))
         print(f"Saved model to {model_file}")
