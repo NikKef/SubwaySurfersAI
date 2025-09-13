@@ -37,3 +37,15 @@ def test_episode_metrics_callback_rollout_averages():
     cb._on_rollout_end()
     mock_logger.record.assert_any_call("rollout/avg_reward", 1.5)
     mock_logger.record.assert_any_call("rollout/avg_length", 15.0)
+
+
+def test_episode_metrics_callback_no_dump_without_metrics():
+    """Logger.dump should not be called if no metrics were recorded."""
+    cb = EpisodeMetricsCallback()
+    mock_logger = Mock()
+    cb.model = Mock()
+    cb.model.logger = mock_logger
+    cb.locals = {"dones": [True], "infos": [{}]}
+    cb.num_timesteps = 0
+    cb._on_step()
+    mock_logger.dump.assert_not_called()
