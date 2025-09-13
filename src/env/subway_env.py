@@ -119,10 +119,22 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         ):
             return True
         try:
-            r, g, b = image.getpixel(CRASH_DISMISS_COORD)
-        except IndexError:
+            np_img = np.array(image)
+        except Exception:
             return False
-        return r > 200 and g < 100 and b < 100
+
+        x, y = CRASH_DISMISS_COORD
+        x0 = max(x - 5, 0)
+        x1 = min(x + 5, np_img.shape[1])
+        y0 = max(y - 5, 0)
+        y1 = min(y + 5, np_img.shape[0])
+        patch = np_img[y0:y1, x0:x1]
+        if patch.size == 0:
+            return False
+        red_mask = (
+            (patch[:, :, 0] > 200) & (patch[:, :, 1] < 100) & (patch[:, :, 2] < 100)
+        )
+        return float(red_mask.mean()) > 0.6
 
     def _log_state(self, image: Image.Image) -> None:
         now = time.time()
