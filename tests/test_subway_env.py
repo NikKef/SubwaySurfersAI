@@ -138,10 +138,10 @@ def test_menu_retry_after_timeout(monkeypatch):
     env = SubwaySurfersEnv(controller=controller)
     env.reset()
 
-    times = iter([0.0, 0.0, 6.0, 6.0])
+    times = iter([0.0, 0.0, 1.1, 1.1])
     monkeypatch.setattr(time, "time", lambda: next(times))
     env.step(0)  # first menu detection, set _menu_since
-    env.step(0)  # after 6s, should tap again
+    env.step(0)  # after timeout, should tap again
     controller.tap.assert_called_with(*PLAY_BUTTON_COORD)
 
 
