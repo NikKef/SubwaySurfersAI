@@ -40,6 +40,9 @@ def update_dqn_hyperparameters(
     current_eps = model.exploration_rate
     if getattr(model, "num_timesteps", 0) == 0 and current_eps == 0:
         current_eps = model.exploration_initial_eps
+    # Clip to the valid [0, 1] range to avoid potential overshoot when resuming
+    # training with a model that has an out-of-bounds epsilon value.
+    current_eps = max(0.0, min(1.0, current_eps))
 
     prev_start = model.exploration_initial_eps
     prev_end = model.exploration_final_eps
@@ -68,8 +71,8 @@ def update_dqn_hyperparameters(
                 return current_eps
             if progress <= progress_end:
                 return exploration_final_eps
-            slope = (exploration_final_eps - current_eps) / remaining_progress
-            return current_eps + slope * (progress - progress_remaining)
+            ratio = (progress - progress_end) / remaining_progress
+            return exploration_final_eps + (current_eps - exploration_final_eps) * ratio
 
         model.exploration_schedule = exploration_schedule
     else:
