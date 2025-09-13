@@ -132,6 +132,19 @@ def test_log_state_reports_menu(caplog):
     assert "Game state: menu" in caplog.text
 
 
+def test_reset_logs_game_started(monkeypatch, caplog):
+    controller = Mock(spec=ADBController)
+    controller.screencap.side_effect = [
+        _fake_png((0, 255, 0)),  # menu frame triggers tap
+        _fake_png(0),  # playing frame after tap
+        _fake_png(0),  # reset frame
+    ]
+    env = SubwaySurfersEnv(controller=controller)
+    with caplog.at_level(logging.INFO):
+        env.reset()
+    assert "game started" in caplog.text.lower()
+
+
 def test_menu_retry_after_timeout(monkeypatch):
     controller = Mock(spec=ADBController)
     controller.screencap.return_value = _fake_png((0, 255, 0))
@@ -158,9 +171,7 @@ def test_episode_end_logs_length_and_reward(caplog, monkeypatch):
     env.reset()
     with caplog.at_level(logging.INFO):
         env.step(0)
-    assert "Game finished" in caplog.text
-    assert "length=1" in caplog.text
-    assert "reward=-1.00" in caplog.text
+    assert "game finished" in caplog.text.lower()
 
 
 def test_no_extra_reward_or_log_after_crash(monkeypatch, caplog):
@@ -183,4 +194,4 @@ def test_no_extra_reward_or_log_after_crash(monkeypatch, caplog):
     assert terminated is True
     assert info == {}
     # Only one game finished log should be emitted
-    assert caplog.text.count("Game finished") == 1
+    assert caplog.text.lower().count("game finished") == 1

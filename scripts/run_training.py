@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 import logging
 
+LOGGER = logging.getLogger(__name__)
+
 import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from stable_baselines3.common.logger import configure
@@ -112,11 +114,11 @@ def main() -> None:
         agent, loaded = load_or_create_dqn_agent(model_file, env, **agent_kwargs)
         agent.model.set_logger(logger)
         if loaded:
-            print(f"Loaded existing model from {model_file}")
+            LOGGER.debug("Loaded existing model from %s", model_file)
         else:
-            print(
-                f"Existing model at {model_file} could not be loaded; "
-                "initialized new agent"
+            LOGGER.debug(
+                "Existing model at %s could not be loaded; initialized new agent",
+                model_file,
             )
     else:
         latest = find_latest_checkpoint(model_file)
@@ -124,13 +126,16 @@ def main() -> None:
             agent, loaded = load_or_create_dqn_agent(latest, env, **agent_kwargs)
             agent.model.set_logger(logger)
             if loaded:
-                print(f"Loaded checkpoint {latest}")
+                LOGGER.debug("Loaded checkpoint %s", latest)
             else:
-                print(f"Checkpoint {latest} could not be loaded; initialized new agent")
+                LOGGER.debug(
+                    "Checkpoint %s could not be loaded; initialized new agent",
+                    latest,
+                )
         else:
             agent = DQNAgent(env, **agent_kwargs)
             agent.model.set_logger(logger)
-            print("Initialized new agent")
+            LOGGER.debug("Initialized new agent")
 
     # Apply potentially updated hyper-parameters when resuming training
     update_dqn_hyperparameters(
@@ -154,18 +159,19 @@ def main() -> None:
 
     steps_done = agent.model.num_timesteps
     steps_remaining = max(train_steps - steps_done, 0)
-    print(
-        f"Training for {steps_remaining} additional timesteps "
-        f"(already trained: {steps_done})"
+    LOGGER.debug(
+        "Training for %d additional timesteps (already trained: %d)",
+        steps_remaining,
+        steps_done,
     )
 
     if steps_remaining > 0:
         agent.train(steps_remaining, callback=callbacks)
         model_file.parent.mkdir(parents=True, exist_ok=True)
         agent.save(str(model_file))
-        print(f"Saved model to {model_file}")
+        LOGGER.debug("Saved model to %s", model_file)
     else:
-        print("Target timesteps already reached; skipping training")
+        LOGGER.debug("Target timesteps already reached; skipping training")
 
     env.close()
 

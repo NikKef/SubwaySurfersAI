@@ -152,6 +152,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
 
     def _ensure_playing(self) -> None:
         """Press buttons to ensure the game is in a running state."""
+        started = False
         while True:
             img = self._capture_raw()
             state = self._detect_state(img)
@@ -163,7 +164,10 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             if state == "menu":
                 self.controller.tap(*PLAY_BUTTON_COORD)
                 time.sleep(1)
+                started = True
                 continue
+            if started:
+                LOGGER.info("game started")
             break
 
     def _get_frame(self) -> np.ndarray:
@@ -194,6 +198,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self._menu_since = now
             elif now - self._menu_since > self.menu_retry_delay:
                 self.controller.tap(*PLAY_BUTTON_COORD)
+                LOGGER.info("game started")
                 self._menu_since = now
             observation = self._preprocess(image)
             return observation, 0.0, False, False, {}
@@ -212,11 +217,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                     "episode_reward": self._episode_reward,
                     "episode_length": self._episode_length,
                 }
-                LOGGER.info(
-                    "Game finished: length=%d, reward=%.2f",
-                    self._episode_length,
-                    self._episode_reward,
-                )
+                LOGGER.info("game finished")
                 self._episode_reward = 0.0
                 self._episode_length = 0
             self._menu_since = None
@@ -251,11 +252,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         observation = self._preprocess(image)
         info: Dict[str, float] = {"steps_survived": self._episode_length}
         if terminated:
-            LOGGER.info(
-                "Game finished: length=%d, reward=%.2f",
-                self._episode_length,
-                self._episode_reward,
-            )
+            LOGGER.info("game finished")
             info = {
                 "steps_survived": self._episode_length,
                 "episode_reward": self._episode_reward,
