@@ -14,20 +14,25 @@ def update_dqn_hyperparameters(
     model,
     *,
     learning_rate: float,
+    gamma: float,
     exploration_fraction: float,
     exploration_final_eps: float,
 ) -> None:
     """Update learning rate and exploration schedule for a loaded DQN model.
 
     This is useful when resuming training with new hyper-parameters.
-    The optimizer's learning rate is updated and the epsilon-greedy schedule
-    is reset so that exploration anneals according to the new parameters.
+    The optimizer's learning rate is updated, the discount factor is
+    refreshed and the epsilon-greedy schedule is reset so that exploration
+    anneals according to the new parameters.
     """
     # Update learning rate for the optimizer and schedule
     model.learning_rate = learning_rate
     model.lr_schedule = lambda _: learning_rate
     for param_group in model.policy.optimizer.param_groups:
         param_group["lr"] = learning_rate
+
+    # Update discount factor
+    model.gamma = gamma
 
     # Reset exploration schedule
     model.exploration_initial_eps = 1.0
