@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from gymnasium import Env
-from stable_baselines3 import DQN
+from .prioritized_dqn import PrioritizedDQN
 from stable_baselines3.common.callbacks import BaseCallback
 
 
@@ -38,7 +38,7 @@ class DQNAgent:
 
         self.env = env
         # ``verbose`` defaults to 0 if not provided to keep logs quiet by default.
-        self.model = DQN(
+        self.model = PrioritizedDQN(
             policy, env, verbose=dqn_kwargs.pop("verbose", 0), **dqn_kwargs
         )
 
@@ -76,7 +76,7 @@ class DQNAgent:
     @classmethod
     def load(cls, path: str, env: Env) -> "DQNAgent":
         """Load a saved agent from ``path`` and attach ``env``."""
-        model = DQN.load(path, env=env)
+        model = PrioritizedDQN.load(path, env=env)
         agent = cls.__new__(cls)
         agent.env = env
         agent.model = model

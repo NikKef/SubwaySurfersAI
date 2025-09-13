@@ -69,6 +69,10 @@ def main() -> None:
     train_steps = int(cfg["train_steps"])
     exploration_fraction = float(cfg.get("exploration_fraction", 0.1))
     exploration_final_eps = float(cfg.get("exploration_final_eps", 0.05))
+    priority_alpha = float(cfg.get("priority_alpha", 0.6))
+    priority_beta = float(cfg.get("priority_beta", 0.4))
+    priority_beta_increment = float(cfg.get("priority_beta_increment", 1e-3))
+    priority_eps = float(cfg.get("priority_eps", 1e-6))
 
     # Resolve model file (Stable-Baselines appends ``.zip`` if missing).
     model_file = args.model_path
@@ -90,6 +94,10 @@ def main() -> None:
         batch_size=batch_size,
         exploration_fraction=exploration_fraction,
         exploration_final_eps=exploration_final_eps,
+        priority_alpha=priority_alpha,
+        priority_beta=priority_beta,
+        priority_beta_increment=priority_beta_increment,
+        priority_eps=priority_eps,
         verbose=1,
         tensorboard_log=str(log_dir),
     )
