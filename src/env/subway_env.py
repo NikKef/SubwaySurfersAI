@@ -199,25 +199,28 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
             return observation, 0.0, False, False, {}
 
         if state == "crashed":
+            # The crash screen is showing before we had a chance to execute an
+            # action. This means the previous episode already ended. Dismiss
+            # the crash screen without modifying rewards or lengths and only
+            # log stats if they haven't been logged yet.
             self.controller.tap(*CRASH_DISMISS_COORD)
             observation = self._preprocess(image)
-            self._episode_reward += -1.0
-            self._episode_length += 1
-            info = {
-                "steps_survived": self._episode_length,
-                "episode_reward": self._episode_reward,
-                "episode_length": self._episode_length,
-            }
-            LOGGER.info(
-                "Game finished: length=%d, reward=%.2f",
-                self._episode_length,
-                self._episode_reward,
-            )
-            self._episode_reward = 0.0
-            self._episode_length = 0
+            info: Dict[str, float] = {}
+            if self._episode_length > 0 or self._episode_reward != 0.0:
+                info = {
+                    "steps_survived": self._episode_length,
+                    "episode_reward": self._episode_reward,
+                    "episode_length": self._episode_length,
+                }
+                LOGGER.info(
+                    "Game finished: length=%d, reward=%.2f",
+                    self._episode_length,
+                    self._episode_reward,
+                )
+                self._episode_reward = 0.0
+                self._episode_length = 0
             self._menu_since = None
-            # Penalize crashes with a negative reward.
-            return observation, -1.0, True, False, info
+            return observation, 0.0, True, False, info
 
         # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:

@@ -161,3 +161,26 @@ def test_episode_end_logs_length_and_reward(caplog, monkeypatch):
     assert "Game finished" in caplog.text
     assert "length=1" in caplog.text
     assert "reward=-1.00" in caplog.text
+
+
+def test_no_extra_reward_or_log_after_crash(monkeypatch, caplog):
+    """Ensure crashing doesn't grant additional rewards on repeated steps."""
+    controller = Mock(spec=ADBController)
+    controller.screencap.side_effect = [
+        _fake_png(0),  # ensure_playing
+        _fake_png(0),  # reset frame
+        _fake_png(0),  # step start
+        _fake_crash_png(),  # crash frame (terminates episode)
+        _fake_crash_png(),  # second step while crash screen is visible
+    ]
+    monkeypatch.setattr(time, "time", lambda: 0.0)
+    env = SubwaySurfersEnv(controller=controller)
+    env.reset()
+    with caplog.at_level(logging.INFO):
+        env.step(0)  # first crash
+        obs, reward, terminated, truncated, info = env.step(0)
+    assert reward == 0.0
+    assert terminated is True
+    assert info == {}
+    # Only one game finished log should be emitted
+    assert caplog.text.count("Game finished") == 1
