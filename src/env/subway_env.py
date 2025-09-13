@@ -53,6 +53,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
+    menu_retry_delay: float = 1.0
     _last_state_log: float = field(init=False, default_factory=lambda: 0.0)
     _episode_reward: float = field(init=False, default_factory=lambda: 0.0)
     _episode_length: int = field(init=False, default_factory=lambda: 0)
@@ -191,7 +192,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         if state == "menu":
             if self._menu_since is None:
                 self._menu_since = now
-            elif now - self._menu_since > 5.0:
+            elif now - self._menu_since > self.menu_retry_delay:
                 self.controller.tap(*PLAY_BUTTON_COORD)
                 self._menu_since = now
             observation = self._preprocess(image)
