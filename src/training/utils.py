@@ -32,8 +32,15 @@ def update_dqn_hyperparameters(
     # Update discount factor
     model.gamma = gamma
 
-    # Preserve current exploration rate instead of resetting to 1.0
+    # Preserve current exploration rate instead of resetting to 1.0. Stable-Baselines3
+    # initializes ``exploration_rate`` to ``0`` for freshly created models and
+    # only sets it to the initial epsilon on the first training step. When
+    # updating hyper-parameters before any training has happened, treat ``0`` as
+    # the initial exploration rate.
     current_eps = model.exploration_rate
+    if getattr(model, "num_timesteps", 0) == 0 and current_eps == 0:
+        current_eps = model.exploration_initial_eps
+
     prev_start = model.exploration_initial_eps
     prev_end = model.exploration_final_eps
     prev_fraction = model.exploration_fraction
