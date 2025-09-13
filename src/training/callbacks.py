@@ -34,19 +34,23 @@ class EpisodeMetricsCallback(BaseCallback):
             if done:
                 reward = info.get("episode_reward")
                 length = info.get("episode_length")
+                has_log = False
                 if reward is not None:
                     self.logger.record(
                         "episode/reward", float(reward), exclude="stdout"
                     )
                     self._episode_rewards.append(float(reward))
+                    has_log = True
                 if length is not None:
                     self.logger.record(
                         "episode/length", float(length), exclude="stdout"
                     )
                     self._episode_lengths.append(float(length))
-                # Dump so values appear in TensorBoard without printing
-                # a summary box to stdout.
-                self.logger.dump(step=self.num_timesteps)
+                    has_log = True
+                if has_log:
+                    # Dump so values appear in TensorBoard without printing
+                    # a summary box to stdout.
+                    self.logger.dump(step=self.num_timesteps)
         return True
 
     def _on_rollout_end(self) -> None:  # pragma: no cover - simple wrapper
