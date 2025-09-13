@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
 
-from stable_baselines3.common.utils import LinearSchedule
-
 from src.agent import DQNAgent
 
 
@@ -34,16 +32,44 @@ def update_dqn_hyperparameters(
     # Update discount factor
     model.gamma = gamma
 
-    # Reset exploration schedule
-    model.exploration_initial_eps = 1.0
+    # Preserve current exploration rate instead of resetting to 1.0
+    current_eps = model.exploration_rate
+    prev_start = model.exploration_initial_eps
+    prev_end = model.exploration_final_eps
+    prev_fraction = model.exploration_fraction
+
+    # Estimate the progress remaining when training was interrupted
+    if current_eps > prev_end:
+        progress_remaining = 1 - prev_fraction * (
+            (current_eps - prev_start) / (prev_end - prev_start)
+        )
+    else:
+        # Annealing already finished
+        progress_remaining = 1 - prev_fraction
+
+    # Update target parameters
+    model.exploration_initial_eps = current_eps
     model.exploration_final_eps = exploration_final_eps
     model.exploration_fraction = exploration_fraction
-    model.exploration_schedule = LinearSchedule(
-        model.exploration_initial_eps,
-        model.exploration_final_eps,
-        model.exploration_fraction,
-    )
-    model.exploration_rate = model.exploration_initial_eps
+
+    progress_end = 1 - exploration_fraction
+    if progress_remaining > progress_end and exploration_fraction > 0:
+        remaining_progress = progress_remaining - progress_end
+
+        def exploration_schedule(progress: float) -> float:
+            if progress >= progress_remaining:
+                return current_eps
+            if progress <= progress_end:
+                return exploration_final_eps
+            slope = (exploration_final_eps - current_eps) / remaining_progress
+            return current_eps + slope * (progress - progress_remaining)
+
+        model.exploration_schedule = exploration_schedule
+    else:
+        # No annealing left; keep exploration rate constant
+        model.exploration_schedule = lambda _: current_eps
+
+    model.exploration_rate = current_eps
 
 
 def load_or_create_dqn_agent(
