@@ -116,6 +116,33 @@ def test_update_dqn_hyperparameters_new_model_uses_initial_eps() -> None:
     assert model.exploration_rate == pytest.approx(model.exploration_initial_eps)
 
 
+def test_exploration_schedule_does_not_exceed_initial_eps() -> None:
+    """Exploration schedule should never return values above the starting epsilon."""
+    env = DummyEnv()
+    agent = DQNAgent(
+        env,
+        policy="CnnPolicy",
+        buffer_size=1,
+        learning_starts=0,
+        train_freq=1,
+        gradient_steps=1,
+    )
+    model = agent.model
+
+    update_dqn_hyperparameters(
+        model,
+        learning_rate=1e-3,
+        gamma=0.95,
+        exploration_fraction=0.2,
+        exploration_final_eps=0.02,
+    )
+
+    schedule = model.exploration_schedule
+    # Progress values just below the starting point should not yield > initial epsilon
+    for progress in np.linspace(0.99, 0.81, num=5):
+        assert schedule(progress) <= model.exploration_initial_eps
+
+
 def test_load_or_create_dqn_agent_handles_space_mismatch(tmp_path) -> None:
     env = DummyEnv()
     agent = DQNAgent(
