@@ -6,17 +6,31 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 import logging
 
 from src.env import SubwaySurfersEnv, ADBController
-from src.env.subway_env import PLAY_BUTTON_COORD
+from src.env.subway_env import PLAY_BUTTON_COORD, CRASH_DISMISS_COORD
 
 
 def _fake_png(color) -> bytes:
     if isinstance(color, int):
         color = (color, color, color)
     img = Image.new("RGB", (1080, 2400), color)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _fake_crash_png() -> bytes:
+    """Return an image with a red patch at the crash dismiss coordinate."""
+    img = Image.new("RGB", (1080, 2400), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    x, y = CRASH_DISMISS_COORD
+    size = 20
+    draw.rectangle(
+        [x - size // 2, y - size // 2, x + size // 2, y + size // 2], fill=(255, 0, 0)
+    )
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -61,13 +75,20 @@ def test_step_swipe_called(monkeypatch, action, coords):
     assert info == {"steps_survived": 1}
 
 
+def test_is_crash_false_on_normal_frame():
+    controller = Mock(spec=ADBController)
+    env = SubwaySurfersEnv(controller=controller)
+    image = Image.new("RGB", (1080, 2400), (0, 0, 0))
+    assert env._is_crash(image) is False
+
+
 def test_step_detects_crash_and_skips(monkeypatch):
     controller = Mock(spec=ADBController)
     controller.screencap.side_effect = [
         _fake_png(0),  # ensure_playing
         _fake_png(0),  # reset frame
         _fake_png(0),  # step start
-        _fake_png((255, 0, 0)),  # crash frame
+        _fake_crash_png(),  # crash frame
     ]
     monkeypatch.setattr(time, "time", lambda: 0.0)
     env = SubwaySurfersEnv(controller=controller)
@@ -130,7 +151,7 @@ def test_episode_end_logs_length_and_reward(caplog, monkeypatch):
         _fake_png(0),  # ensure_playing
         _fake_png(0),  # reset frame
         _fake_png(0),  # step start
-        _fake_png((255, 0, 0)),  # crash frame
+        _fake_crash_png(),  # crash frame
     ]
     monkeypatch.setattr(time, "time", lambda: 0.0)
     env = SubwaySurfersEnv(controller=controller)
