@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import List
 
+import logging
 from stable_baselines3.common.callbacks import BaseCallback
 
 
@@ -51,6 +52,12 @@ class EpisodeMetricsCallback(BaseCallback):
                     # Dump so values appear in TensorBoard without printing
                     # a summary box to stdout.
                     self.logger.dump(step=self.num_timesteps)
+                    if reward is not None and length is not None:
+                        logging.info(
+                            "Episode finished: reward=%.2f length=%d",
+                            float(reward),
+                            int(length),
+                        )
         return True
 
     def _on_rollout_end(self) -> None:  # pragma: no cover - simple wrapper
