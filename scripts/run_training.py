@@ -132,6 +132,7 @@ def main() -> None:
     update_dqn_hyperparameters(
         agent.model,
         learning_rate=learning_rate,
+        gamma=gamma,
         exploration_fraction=exploration_fraction,
         exploration_final_eps=exploration_final_eps,
     )

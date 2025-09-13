@@ -1,7 +1,8 @@
 # Default hyper-parameters for training
 batch_size: 64
 learning_rate: 1e-4
-gamma: 0.99
+# Discount factor for future rewards.
+gamma: 0.995
 buffer_size: 100000
 train_steps: 1000000
 checkpoint_freq: 10000
