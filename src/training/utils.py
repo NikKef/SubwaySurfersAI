@@ -56,7 +56,8 @@ def load_or_create_dqn_agent(
     Parameters
     ----------
     model_path:
-        Path to the saved model. If loading fails (e.g. due to mismatched
+        Path to the saved model. The associated replay-buffer file will also be
+        restored if present. If loading fails (e.g. due to mismatched
         observation spaces), a new agent is instantiated instead.
     env:
         Environment to attach to the agent.
