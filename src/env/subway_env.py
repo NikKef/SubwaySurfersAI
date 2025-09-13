@@ -38,8 +38,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     The environment communicates with an Android emulator via ``ADBController``.
     Observations are RGB frames resized to ``frame_size``. Actions are discrete
     swipes: left, right, jump, roll. If ``templates/menu_full.png`` and
-    ``templates/crash_full.png`` exist, they are used for template matching to
-    detect the menu and crash screens. The environment logs the detected game
+    ``templates/templates_crash_full.png`` exist, they are used for template matching
+    to detect the menu and crash screens. The environment logs the detected game
     state every ``state_log_interval`` seconds.
     """
 
@@ -49,7 +49,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         default_factory=lambda: DEFAULT_ACTION_COORDS.copy()
     )
     menu_template_path: Optional[Path] = Path("templates/menu_full.png")
-    crash_template_path: Optional[Path] = Path("templates/crash_full.png")
+    crash_template_path: Optional[Path] = Path("templates/templates_crash_full.png")
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
@@ -114,10 +114,8 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         return g > 150 and r < 100 and b < 100
 
     def _is_crash(self, image: Image.Image) -> bool:
-        if self.crash_template is not None and self._match_template(
-            image, self.crash_template
-        ):
-            return True
+        if self.crash_template is not None:
+            return self._match_template(image, self.crash_template)
         try:
             np_img = np.array(image)
         except Exception:

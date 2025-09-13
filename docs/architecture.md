@@ -8,7 +8,7 @@ This document will track design decisions and architecture diagrams for the Subw
   - `SubwaySurfersEnv` exposes a Gymnasium-compatible interface built on top of
     `ADBController` for training and evaluation. It automatically taps the
     menu **PLAY** button and dismisses the *Save Me?* dialog using template
-    matching with `templates/menu_full.png` and `templates/crash_full.png`
+    matching with `templates/menu_full.png` and `templates/templates_crash_full.png`
     (falling back to color checks if templates are missing). It logs the
     current game state every few seconds, retries tapping **PLAY** if the game
     stays on the menu for more than five seconds, and measures rewards based on
