@@ -54,8 +54,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
     _last_state_log: float = field(init=False, default_factory=lambda: 0.0)
-    _last_frame_time: float = field(init=False, default_factory=lambda: 0.0)
-    _elapsed_play_time: float = field(init=False, default_factory=lambda: 0.0)
     _episode_reward: float = field(init=False, default_factory=lambda: 0.0)
     _episode_length: int = field(init=False, default_factory=lambda: 0)
     _menu_since: Optional[float] = field(init=False, default=None)
@@ -166,8 +164,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         super().reset(seed=seed)
         self._ensure_playing()
         image = self._capture_raw()
-        self._last_frame_time = time.time()
-        self._elapsed_play_time = 0.0
         self._episode_reward = 0.0
         self._episode_length = 0
         self._menu_since = None
@@ -189,17 +185,15 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self.controller.tap(*PLAY_BUTTON_COORD)
                 self._menu_since = now
             observation = self._preprocess(image)
-            self._last_frame_time = now
             return observation, 0.0, False, False, {}
 
         if state == "crashed":
             self.controller.tap(*CRASH_DISMISS_COORD)
             observation = self._preprocess(image)
-            self._last_frame_time = now
             self._episode_reward += -1.0
             self._episode_length += 1
             info = {
-                "time_survived": self._elapsed_play_time,
+                "steps_survived": self._episode_length,
                 "episode_reward": self._episode_reward,
                 "episode_length": self._episode_length,
             }
@@ -208,7 +202,6 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self._episode_length,
                 self._episode_reward,
             )
-            self._elapsed_play_time = 0.0
             self._episode_reward = 0.0
             self._episode_length = 0
             self._menu_since = None
@@ -225,9 +218,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         state = self._detect_state(image)
         now2 = time.time()
         self._log_state(image)
-        time_reward = max(now2 - self._last_frame_time, 0.0)
-        self._elapsed_play_time += time_reward
-        self._last_frame_time = now2
+        time_reward = 1.0
 
         terminated = False
         reward = time_reward
@@ -244,7 +235,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         self._episode_length += 1
 
         observation = self._preprocess(image)
-        info: Dict[str, float] = {"time_survived": self._elapsed_play_time}
+        info: Dict[str, float] = {"steps_survived": self._episode_length}
         if terminated:
             LOGGER.info(
                 "Game finished: length=%d, reward=%.2f",
@@ -252,11 +243,10 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                 self._episode_reward,
             )
             info = {
-                "time_survived": self._elapsed_play_time,
+                "steps_survived": self._episode_length,
                 "episode_reward": self._episode_reward,
                 "episode_length": self._episode_length,
             }
-            self._elapsed_play_time = 0.0
             self._episode_reward = 0.0
             self._episode_length = 0
         return observation, reward, terminated, False, info
