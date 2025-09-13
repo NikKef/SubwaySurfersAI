@@ -64,9 +64,16 @@ def test_update_dqn_hyperparameters() -> None:
     model.exploration_rate = 0.2
     model.policy.optimizer.param_groups[0]["lr"] = 1e-4
 
+    # Progress remaining before update for the default schedule
+    prev_progress_remaining = 1 - model.exploration_fraction * (
+        (model.exploration_rate - model.exploration_initial_eps)
+        / (model.exploration_final_eps - model.exploration_initial_eps)
+    )
+
     update_dqn_hyperparameters(
         model,
         learning_rate=1e-3,
+        gamma=0.95,
         exploration_fraction=0.5,
         exploration_final_eps=0.1,
     )
@@ -75,12 +82,15 @@ def test_update_dqn_hyperparameters() -> None:
     assert all(
         pg["lr"] == pytest.approx(1e-3) for pg in model.policy.optimizer.param_groups
     )
-    assert model.exploration_rate == pytest.approx(1.0)
+    assert model.gamma == pytest.approx(0.95)
+    assert model.exploration_rate == pytest.approx(0.2)
     assert model.exploration_final_eps == pytest.approx(0.1)
     assert model.exploration_fraction == pytest.approx(0.5)
     schedule = model.exploration_schedule
-    assert schedule(1.0) == pytest.approx(1.0)
-    assert schedule(0.0) == pytest.approx(0.1)
+    # Schedule starts from the previous exploration rate
+    assert schedule(prev_progress_remaining) == pytest.approx(0.2)
+    # and anneals to the new final epsilon
+    assert schedule(0.5) == pytest.approx(0.1)
 
 
 def test_load_or_create_dqn_agent_handles_space_mismatch(tmp_path) -> None:
