@@ -58,7 +58,7 @@ def test_step_swipe_called(monkeypatch, action, coords):
     assert reward >= 0.0
     assert terminated is False
     assert truncated is False
-    assert info == {"time_survived": 0.0}
+    assert info == {"steps_survived": 1}
 
 
 def test_step_detects_crash_and_skips(monkeypatch):
@@ -77,7 +77,7 @@ def test_step_detects_crash_and_skips(monkeypatch):
     assert reward == -1.0
     assert terminated is True
     assert info == {
-        "time_survived": 0.0,
+        "steps_survived": 1,
         "episode_reward": -1.0,
         "episode_length": 1,
     }
