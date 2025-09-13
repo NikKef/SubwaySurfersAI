@@ -9,6 +9,7 @@ trained or used to produce actions given observations.
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 
 from gymnasium import Env
 from .prioritized_dqn import PrioritizedDQN
@@ -70,13 +71,32 @@ class DQNAgent:
         return int(action)
 
     def save(self, path: str) -> None:
-        """Persist model parameters to ``path``."""
+        """Persist model parameters and replay buffer to ``path``."""
         self.model.save(path)
+        # Save replay buffer alongside the model so that training can resume
+        # without losing past experiences. Stable-Baselines3 appends the
+        # appropriate extension when saving the buffer.
+        self.model.save_replay_buffer(path + "_replay_buffer")
 
     @classmethod
     def load(cls, path: str, env: Env) -> "DQNAgent":
-        """Load a saved agent from ``path`` and attach ``env``."""
+        """Load a saved agent from ``path`` and attach ``env``.
+
+        Besides the model parameters, this also restores the replay buffer if a
+        matching ``*_replay_buffer.pkl`` file is found. This enables seamless
+        resumption of training from checkpoints saved with
+        :func:`CheckpointCallback` or via :meth:`save`.
+        """
         model = PrioritizedDQN.load(path, env=env)
+        # Determine potential replay buffer file locations. When checkpoints are
+        # saved via ``CheckpointCallback`` the buffer file does not include the
+        # ``.zip`` suffix, whereas :meth:`save` keeps the suffix in place.
+        p = Path(path)
+        candidates = [Path(path + "_replay_buffer.pkl"), p.with_name(p.stem + "_replay_buffer.pkl")]
+        for buffer_path in candidates:
+            if buffer_path.exists():
+                model.load_replay_buffer(str(buffer_path))
+                break
         agent = cls.__new__(cls)
         agent.env = env
         agent.model = model

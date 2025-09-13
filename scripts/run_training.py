@@ -31,7 +31,11 @@ def find_latest_checkpoint(model_file: Path) -> Path | None:
 
     checkpoint_dir = model_file.parent / "checkpoints"
     pattern = f"{model_file.stem}_*.zip"
-    candidates = sorted(checkpoint_dir.glob(pattern))
+    candidates = sorted(
+        p
+        for p in checkpoint_dir.glob(pattern)
+        if (p.with_name(f"{p.stem}_replay_buffer.pkl")).exists()
+    )
     return candidates[-1] if candidates else None
 
 
@@ -144,6 +148,7 @@ def main() -> None:
         save_freq=int(cfg.get("checkpoint_freq", 10000)),
         save_path=str(checkpoint_dir),
         name_prefix=model_file.stem,
+        save_replay_buffer=True,
     )
     callbacks = CallbackList([checkpoint_callback, EpisodeMetricsCallback()])
 
