@@ -93,6 +93,29 @@ def test_update_dqn_hyperparameters() -> None:
     assert schedule(0.5) == pytest.approx(0.1)
 
 
+def test_update_dqn_hyperparameters_new_model_uses_initial_eps() -> None:
+    """For a freshly created model, default exploration rate should be 1.0."""
+    env = DummyEnv()
+    agent = DQNAgent(
+        env,
+        policy="CnnPolicy",
+        buffer_size=1,
+        learning_starts=0,
+        train_freq=1,
+        gradient_steps=1,
+    )
+    model = agent.model
+    assert model.exploration_rate == 0.0
+    update_dqn_hyperparameters(
+        model,
+        learning_rate=1e-3,
+        gamma=0.95,
+        exploration_fraction=0.5,
+        exploration_final_eps=0.1,
+    )
+    assert model.exploration_rate == pytest.approx(model.exploration_initial_eps)
+
+
 def test_load_or_create_dqn_agent_handles_space_mismatch(tmp_path) -> None:
     env = DummyEnv()
     agent = DQNAgent(
