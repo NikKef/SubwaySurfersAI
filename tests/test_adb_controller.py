@@ -21,6 +21,7 @@ def test_tap_invokes_adb_with_coordinates() -> None:
                 "20",
             ],
             check=True,
+            timeout=controller.timeout,
         )
 
 
@@ -29,5 +30,10 @@ def test_screencap_returns_bytes() -> None:
     fake_result = mock.Mock(stdout=b"pngbytes")
     with mock.patch("src.env.adb_controller.run", return_value=fake_result) as run_mock:
         data = controller.screencap()
-    run_mock.assert_called_once()
+        run_mock.assert_called_once_with(
+            ["adb", "exec-out", "screencap", "-p"],
+            check=True,
+            capture_output=True,
+            timeout=controller.timeout,
+        )
     assert data == b"pngbytes"
