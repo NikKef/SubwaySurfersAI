@@ -49,7 +49,7 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         default_factory=lambda: DEFAULT_ACTION_COORDS.copy()
     )
     menu_template_path: Optional[Path] = Path("templates/menu_full.png")
-    crash_template_path: Optional[Path] = Path("templates/templates_crash_full.png")
+    crash_template_path: Optional[Path] = Path("templates/crash_full.png")
     menu_template: Optional[np.ndarray] = field(init=False, default=None)
     crash_template: Optional[np.ndarray] = field(init=False, default=None)
     state_log_interval: float = 2.0
