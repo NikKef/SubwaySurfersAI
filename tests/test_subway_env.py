@@ -171,7 +171,12 @@ def test_episode_end_logs_length_and_reward(caplog, monkeypatch):
     env.reset()
     with caplog.at_level(logging.INFO):
         env.step(0)
-    assert "game finished" in caplog.text.lower()
+    assert any(
+        "game finished" in record.message
+        and "reward:-1.0" in record.message
+        and "length:1" in record.message
+        for record in caplog.records
+    )
 
 
 def test_no_extra_reward_or_log_after_crash(monkeypatch, caplog):

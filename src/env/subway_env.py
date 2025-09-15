@@ -217,7 +217,11 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
                     "episode_reward": self._episode_reward,
                     "episode_length": self._episode_length,
                 }
-                LOGGER.info("game finished")
+                LOGGER.info(
+                    "game finished     reward:%s     length:%s",
+                    self._episode_reward,
+                    self._episode_length,
+                )
                 self._episode_reward = 0.0
                 self._episode_length = 0
             self._menu_since = None
@@ -252,7 +256,11 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
         observation = self._preprocess(image)
         info: Dict[str, float] = {"steps_survived": self._episode_length}
         if terminated:
-            LOGGER.info("game finished")
+            LOGGER.info(
+                "game finished     reward:%s     length:%s",
+                self._episode_reward,
+                self._episode_length,
+            )
             info = {
                 "steps_survived": self._episode_length,
                 "episode_reward": self._episode_reward,
