@@ -1,3 +1,3 @@
-from .callbacks import EpisodeMetricsCallback
+from .callbacks import EpisodeMetricsCallback, LatestCheckpointCallback
 
-__all__ = ["EpisodeMetricsCallback"]
+__all__ = ["EpisodeMetricsCallback", "LatestCheckpointCallback"]
