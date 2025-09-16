@@ -10,7 +10,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 import yaml
-from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
+from stable_baselines3.common.callbacks import CallbackList
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 
@@ -21,7 +21,10 @@ if str(ROOT) not in sys.path:
 
 from src.agent import DQNAgent  # noqa: E402
 from src.env import SubwaySurfersEnv  # noqa: E402
-from src.training import EpisodeMetricsCallback  # noqa: E402
+from src.training import (  # noqa: E402
+    EpisodeMetricsCallback,
+    LatestCheckpointCallback,
+)
 from src.training.utils import (  # noqa: E402
     update_dqn_hyperparameters,
     load_or_create_dqn_agent,
@@ -149,8 +152,8 @@ def main() -> None:
     # Setup checkpointing
     checkpoint_dir = model_file.parent / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_callback = CheckpointCallback(
-        save_freq=int(cfg.get("checkpoint_freq", 10000)),
+    checkpoint_callback = LatestCheckpointCallback(
+        save_freq=int(cfg.get("checkpoint_freq", 1000)),
         save_path=str(checkpoint_dir),
         name_prefix=model_file.stem,
         save_replay_buffer=True,
