@@ -205,27 +205,29 @@ class SubwaySurfersEnv(gym.Env[np.ndarray, int]):
 
         if state == "crashed":
             # The crash screen is showing before we had a chance to execute an
-            # action. This means the previous episode already ended. Dismiss
-            # the crash screen without modifying rewards or lengths and only
-            # log stats if they haven't been logged yet.
+            # action. Penalize the agent regardless of whether an action was
+            # executed and log the episode outcome.
             self.controller.tap(*CRASH_DISMISS_COORD)
             observation = self._preprocess(image)
-            info: Dict[str, float] = {}
-            if self._episode_length > 0 or self._episode_reward != 0.0:
-                info = {
-                    "steps_survived": self._episode_length,
-                    "episode_reward": self._episode_reward,
-                    "episode_length": self._episode_length,
-                }
-                LOGGER.info(
-                    "game finished     reward:%s     length:%s",
-                    self._episode_reward,
-                    self._episode_length,
-                )
-                self._episode_reward = 0.0
-                self._episode_length = 0
+            reward = -1.0
+            terminated = True
+
+            self._episode_reward += reward
+            self._episode_length += 1
+            info: Dict[str, float] = {
+                "steps_survived": self._episode_length,
+                "episode_reward": self._episode_reward,
+                "episode_length": self._episode_length,
+            }
+            LOGGER.info(
+                "game finished     reward:%s     length:%s",
+                self._episode_reward,
+                self._episode_length,
+            )
+            self._episode_reward = 0.0
+            self._episode_length = 0
             self._menu_since = None
-            return observation, 0.0, True, False, info
+            return observation, reward, terminated, False, info
 
         # Playing: execute action and compute time-based reward.
         if action not in self.action_coords:
