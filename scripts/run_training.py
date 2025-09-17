@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import re
 import sys
 from pathlib import Path
-import logging
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,15 +32,32 @@ from src.training.utils import (  # noqa: E402
 )
 
 
+_CHECKPOINT_PATTERN = re.compile(r"(?P<prefix>.+)_(?P<steps>\d+)_steps")
+
+
+def _has_matching_replay_buffer(checkpoint: Path) -> bool:
+    """Return ``True`` if a replay buffer matching ``checkpoint`` exists."""
+
+    candidates = [checkpoint.with_name(f"{checkpoint.stem}_replay_buffer.pkl")]
+
+    match = _CHECKPOINT_PATTERN.match(checkpoint.stem)
+    if match:
+        prefix = match.group("prefix")
+        steps = match.group("steps")
+        candidates.append(
+            checkpoint.with_name(f"{prefix}_replay_buffer_{steps}_steps.pkl")
+        )
+
+    return any(candidate.exists() for candidate in candidates)
+
+
 def find_latest_checkpoint(model_file: Path) -> Path | None:
     """Return path to the most recent checkpoint if present."""
 
     checkpoint_dir = model_file.parent / "checkpoints"
     pattern = f"{model_file.stem}_*.zip"
     candidates = sorted(
-        p
-        for p in checkpoint_dir.glob(pattern)
-        if (p.with_name(f"{p.stem}_replay_buffer.pkl")).exists()
+        p for p in checkpoint_dir.glob(pattern) if _has_matching_replay_buffer(p)
     )
     return candidates[-1] if candidates else None
 
