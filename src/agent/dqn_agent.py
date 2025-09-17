@@ -8,8 +8,9 @@ trained or used to produce actions given observations.
 
 from __future__ import annotations
 
-from typing import Any
+import re
 from pathlib import Path
+from typing import Any
 
 from gymnasium import Env
 from .prioritized_dqn import PrioritizedDQN
@@ -92,7 +93,16 @@ class DQNAgent:
         # saved via ``CheckpointCallback`` the buffer file does not include the
         # ``.zip`` suffix, whereas :meth:`save` keeps the suffix in place.
         p = Path(path)
+        checkpoint_match = re.match(r"(?P<prefix>.+)_(?P<steps>\d+)_steps", p.stem)
         candidates = [Path(path + "_replay_buffer.pkl"), p.with_name(p.stem + "_replay_buffer.pkl")]
+        if checkpoint_match:
+            checkpoint_prefix = checkpoint_match.group("prefix")
+            checkpoint_steps = checkpoint_match.group("steps")
+            candidates.append(
+                p.with_name(
+                    f"{checkpoint_prefix}_replay_buffer_{checkpoint_steps}_steps.pkl"
+                )
+            )
         for buffer_path in candidates:
             if buffer_path.exists():
                 model.load_replay_buffer(str(buffer_path))
