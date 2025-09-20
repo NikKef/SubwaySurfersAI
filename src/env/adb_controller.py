@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from subprocess import run, CompletedProcess, TimeoutExpired
+from time import sleep
 from typing import List, Optional
 
 
@@ -25,11 +26,20 @@ class ADBController:
     device_id:
         Optional serial of the target emulator/device.  If omitted the first
         available device will be used.
+    timeout:
+        Maximum number of seconds to wait for a single ``adb`` invocation.
+    max_retries:
+        Number of times to retry a command that times out.  Retries reuse the
+        previous command and progressively increase the timeout.
+    retry_backoff:
+        Multiplicative factor applied to the timeout after each failed attempt.
     """
 
     adb_path: str = "adb"
     device_id: Optional[str] = None
     timeout: float = 5.0
+    max_retries: int = 2
+    retry_backoff: float = 2.0
 
     def _prefix(self) -> List[str]:
         """Build the base adb command list."""
@@ -45,12 +55,19 @@ class ADBController:
         emulator is connected or ``adb`` becomes unresponsive.
         """
 
-        try:
-            return run(cmd, timeout=self.timeout, **kwargs)
-        except TimeoutExpired as exc:  # pragma: no cover - edge case
-            raise RuntimeError(
-                "ADB command timed out; ensure an emulator is running"
-            ) from exc
+        timeout = self.timeout
+        attempt = 0
+        while True:
+            try:
+                return run(cmd, timeout=timeout, **kwargs)
+            except TimeoutExpired as exc:  # pragma: no cover - edge case
+                attempt += 1
+                if attempt > self.max_retries:
+                    raise RuntimeError(
+                        "ADB command timed out; ensure an emulator is running"
+                    ) from exc
+                timeout *= self.retry_backoff
+                sleep(0.5)
 
     def screencap(self) -> bytes:
         """Return a PNG screenshot taken from the emulator.
