@@ -1,5 +1,6 @@
 """Tests for the ADBController."""
 
+from subprocess import TimeoutExpired
 from unittest import mock
 
 from src.env import ADBController
@@ -35,5 +36,23 @@ def test_screencap_returns_bytes() -> None:
             check=True,
             capture_output=True,
             timeout=controller.timeout,
-        )
+    )
     assert data == b"pngbytes"
+
+
+def test_timeout_is_retried_with_backoff() -> None:
+    controller = ADBController(timeout=1.0, max_retries=1, retry_backoff=2.0)
+
+    def run_side_effect(cmd, timeout, **kwargs):
+        if timeout < 2.0:
+            raise TimeoutExpired(cmd=cmd, timeout=timeout)
+        return mock.Mock()
+
+    with mock.patch("src.env.adb_controller.run", side_effect=run_side_effect) as run_mock:
+        controller.tap(1, 2)
+
+    assert run_mock.call_count == 2
+    first_timeout = run_mock.call_args_list[0].kwargs["timeout"]
+    second_timeout = run_mock.call_args_list[1].kwargs["timeout"]
+    assert first_timeout == controller.timeout
+    assert second_timeout == controller.timeout * controller.retry_backoff
